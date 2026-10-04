@@ -86,10 +86,6 @@ scripts/      Agent install and macOS packaging scripts
 docs/         Feature and setup documentation
 ```
 
-## Installer and application documentation
-
-- [Installer downloads and setup details](https://pulse-serve.com/resources/ps-pocketedge/)
-- [Application documentation](https://pulse-serve.com/resources/ps-pocketedge/docs/)
 
 ## License
 
