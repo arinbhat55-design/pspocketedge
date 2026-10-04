@@ -2,12 +2,6 @@
 
 Manage containers, servers, deployments, and databases across your machines from one dashboard — without Docker Desktop.
 
-## Installer and application documentation
-
-- [Installer downloads and setup details](https://pulse-serve.com/resources/ps-pocketedge/)
-- [Application documentation](https://pulse-serve.com/resources/ps-pocketedge/docs/)
-
-
 PS-pocketEdge has three parts:
 
 | Part | Binary / folder | What it does |
@@ -91,6 +85,11 @@ installer/    macOS installer app
 scripts/      Agent install and macOS packaging scripts
 docs/         Feature and setup documentation
 ```
+
+## Installer and application documentation
+
+- [Installer downloads and setup details](https://pulse-serve.com/resources/ps-pocketedge/)
+- [Application documentation](https://pulse-serve.com/resources/ps-pocketedge/docs/)
 
 ## License
 
