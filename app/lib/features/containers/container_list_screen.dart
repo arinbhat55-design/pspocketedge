@@ -13,6 +13,7 @@ import '../../widgets/status_pill.dart';
 import 'container_detail_screen.dart';
 import 'container_table.dart';
 import 'create_container_dialog.dart';
+import 'remove_container_dialog.dart';
 import '../../theme/app_theme.dart';
 
 const _groupByLabels = {
@@ -293,29 +294,14 @@ class _ContainerListScreenState extends State<ContainerListScreen> {
     ];
     if (targets.isEmpty) return;
 
+    var removeVolumes = false;
     if (action == 'remove') {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: Text('Remove ${targets.length} container(s)?'),
-          content: const Text(
-            'This permanently deletes them, stopping any that are still running. '
-            'Any data outside a named volume is lost.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.failed),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Remove'),
-            ),
-          ],
-        ),
+      final choice = await showRemoveContainerDialog(
+        context,
+        count: targets.length,
       );
-      if (confirmed != true) return;
+      if (choice == null) return;
+      removeVolumes = choice.removeVolumes;
     }
 
     setState(() => _bulkRunning = true);
@@ -324,6 +310,7 @@ class _ContainerListScreenState extends State<ContainerListScreen> {
         targets,
         action,
         force: action == 'remove',
+        removeVolumes: removeVolumes,
       );
       final succeeded = results.where((r) => r.success).length;
       final failed = results.length - succeeded;
@@ -792,29 +779,11 @@ class _ContainerListScreenState extends State<ContainerListScreen> {
   }
 
   Future<void> _runRowAction(FleetContainer c, String action) async {
+    var removeVolumes = false;
     if (action == 'remove') {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Remove container?'),
-          content: const Text(
-            'This permanently deletes the container, stopping it first if '
-            'running. Any data outside a named volume is lost.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.failed),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Remove'),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true) return;
+      final choice = await showRemoveContainerDialog(context);
+      if (choice == null) return;
+      removeVolumes = choice.removeVolumes;
     }
 
     try {
@@ -823,6 +792,7 @@ class _ContainerListScreenState extends State<ContainerListScreen> {
         c.container.containerId,
         action,
         force: action == 'remove',
+        removeVolumes: removeVolumes,
       );
       if (!mounted) return;
       if (!result.success) {

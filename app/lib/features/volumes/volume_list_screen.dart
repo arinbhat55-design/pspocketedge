@@ -34,6 +34,7 @@ class _VolumeListScreenState extends State<VolumeListScreen> {
 
   String? _selectedServerId;
   bool _orphanedOnly = false;
+  bool _pruning = false;
   Map<String, String> _serverNames = {};
 
   @override
@@ -100,6 +101,69 @@ class _VolumeListScreenState extends State<VolumeListScreen> {
       volume: volume,
     );
     if (deleted == true) _refresh();
+  }
+
+  /// Prunes unused volumes on the selected server: anonymous ones only, or
+  /// with [all] unused named ones too. Deployment volumes are always kept
+  /// (see PruneVolumes in internal/agent/docker/volumes.go).
+  Future<void> _prune({required bool all}) async {
+    final serverId = _selectedServerId;
+    if (serverId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(
+          all ? 'Prune all unused volumes?' : 'Prune anonymous volumes?',
+        ),
+        content: Text(
+          all
+              ? 'Permanently deletes every volume no container is using on '
+                    '${_serverNames[serverId] ?? 'this server'}, including named '
+                    'ones and the data in them. Deployment volumes are kept.'
+              : 'Permanently deletes unnamed volumes no container is using on '
+                    '${_serverNames[serverId] ?? 'this server'} — typically left '
+                    'behind by removed containers. Named volumes are kept.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.failed),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Prune'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _pruning = true);
+    try {
+      final result = await widget.apiClient.pruneVolumes(serverId, all: all);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.success
+                ? 'Removed ${result.removedCount} volume(s), reclaimed '
+                      '${formatBytes(result.reclaimedBytes)}'
+                : result.error ?? 'Prune failed',
+          ),
+        ),
+      );
+      if (result.success) _refresh();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Prune failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _pruning = false);
+    }
   }
 
   @override
@@ -199,6 +263,28 @@ class _VolumeListScreenState extends State<VolumeListScreen> {
                             onSelected: (v) =>
                                 setState(() => _orphanedOnly = v),
                           ),
+                          if (widget.isAdmin && _selectedServerId != null) ...[
+                            const SizedBox(width: 4),
+                            const VerticalDivider(width: 1),
+                            const SizedBox(width: 4),
+                            OutlinedButton.icon(
+                              onPressed: _pruning
+                                  ? null
+                                  : () => _prune(all: false),
+                              icon: const Icon(
+                                Icons.cleaning_services,
+                                size: 16,
+                              ),
+                              label: const Text('Prune anonymous'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _pruning
+                                  ? null
+                                  : () => _prune(all: true),
+                              icon: const Icon(Icons.delete_sweep, size: 16),
+                              label: const Text('Prune all unused'),
+                            ),
+                          ],
                         ],
                       ),
                     ),

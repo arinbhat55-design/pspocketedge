@@ -8,7 +8,9 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/versions"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 )
@@ -152,6 +154,42 @@ func RemoveVolume(ctx context.Context, cli *client.Client, name string, force bo
 		return errors.New("no such volume: " + name)
 	}
 	return err
+}
+
+// VolumePruneReport summarizes a PruneVolumes call.
+type VolumePruneReport struct {
+	Removed        int
+	ReclaimedBytes int64
+}
+
+// minAnonymousPruneAPI is the first Engine API whose volume prune spares
+// named volumes by default. Older engines (and Podman's compat API) remove
+// every unused volume, named or not, on a plain prune.
+const minAnonymousPruneAPI = "1.42"
+
+// PruneVolumes removes volumes no container references: only anonymous ones
+// (all=false, matching `docker volume prune`), or unused named ones too
+// (all=true, matching `docker volume prune -a`). Deployment volumes are
+// always kept, since a redeploy or restore reattaches them by name.
+//
+// Older engines lack the anonymous-only default, so a plain prune there
+// would delete named volumes; PruneVolumes refuses rather than guess.
+func PruneVolumes(ctx context.Context, cli *client.Client, all bool) (VolumePruneReport, error) {
+	cli.NegotiateAPIVersion(ctx)
+	if v := cli.ClientVersion(); versions.LessThan(v, minAnonymousPruneAPI) {
+		return VolumePruneReport{}, fmt.Errorf("volume prune needs Engine API %s or newer (Docker 23+); this runtime speaks %s — remove volumes individually instead", minAnonymousPruneAPI, v)
+	}
+
+	args := filters.NewArgs()
+	args.Add("label!", labelDeploymentID)
+	if all {
+		args.Add("all", "true")
+	}
+	report, err := cli.VolumesPrune(ctx, args)
+	if err != nil {
+		return VolumePruneReport{}, err
+	}
+	return VolumePruneReport{Removed: len(report.VolumesDeleted), ReclaimedBytes: int64(report.SpaceReclaimed)}, nil
 }
 
 // InspectVolume returns name's full detail. A not-found or otherwise failed

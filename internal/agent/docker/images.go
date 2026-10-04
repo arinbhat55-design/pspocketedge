@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/containerd/errdefs"
+	"github.com/docker/docker/api/types/build"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -280,6 +281,18 @@ func PruneImages(ctx context.Context, cli *client.Client, all bool) (int64, erro
 		args.Add("dangling", "true")
 	}
 	report, err := cli.ImagesPrune(ctx, args)
+	if err != nil {
+		return 0, err
+	}
+	return int64(report.SpaceReclaimed), nil
+}
+
+// PruneBuildCache removes dangling build cache (all=false) or every cache
+// record not used by an in-progress build (all=true, matching
+// `docker builder prune -a`), returning the total bytes reclaimed. The
+// next build of each image simply runs uncached.
+func PruneBuildCache(ctx context.Context, cli *client.Client, all bool) (int64, error) {
+	report, err := cli.BuildCachePrune(ctx, build.CachePruneOptions{All: all})
 	if err != nil {
 		return 0, err
 	}

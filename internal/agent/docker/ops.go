@@ -20,8 +20,10 @@ import (
 // ContainerAction applies one lifecycle operation to an existing
 // container. timeoutSeconds governs the graceful window for STOP/RESTART
 // (<=0 uses the Docker Engine default); force governs whether REMOVE is
-// allowed against a still-running container.
-func ContainerAction(ctx context.Context, cli *client.Client, containerID string, action agentv1.ContainerAction, timeoutSeconds int32, force bool) error {
+// allowed against a still-running container, and removeVolumes whether
+// REMOVE also deletes the container's anonymous volumes (named volumes are
+// always kept, same as `docker rm -v`).
+func ContainerAction(ctx context.Context, cli *client.Client, containerID string, action agentv1.ContainerAction, timeoutSeconds int32, force, removeVolumes bool) error {
 	switch action {
 	case agentv1.ContainerAction_CONTAINER_ACTION_START:
 		return cli.ContainerStart(ctx, containerID, container.StartOptions{})
@@ -38,7 +40,7 @@ func ContainerAction(ctx context.Context, cli *client.Client, containerID string
 		// container that STOP's graceful signal won't reach.
 		return cli.ContainerKill(ctx, containerID, "SIGKILL")
 	case agentv1.ContainerAction_CONTAINER_ACTION_REMOVE:
-		return cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: force})
+		return cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: force, RemoveVolumes: removeVolumes})
 	default:
 		return fmt.Errorf("unsupported container action: %v", action)
 	}

@@ -182,9 +182,11 @@ func handleInspectVolume(log *slog.Logger, dispatcher *deploy.Dispatcher, waiter
 
 // volumeOpResponse is the JSON shape for a create/remove result.
 type volumeOpResponse struct {
-	Success bool   `json:"success"`
-	Error   string `json:"error,omitempty"`
-	Name    string `json:"name,omitempty"`
+	Success        bool   `json:"success"`
+	Error          string `json:"error,omitempty"`
+	Name           string `json:"name,omitempty"`
+	ReclaimedBytes int64  `json:"reclaimedBytes,omitempty"`
+	RemovedCount   int32  `json:"removedCount,omitempty"`
 }
 
 // sendAndAwaitVolumeOp mirrors sendAndAwaitImageOp.
@@ -226,9 +228,11 @@ func writeVolumeOpResult(w http.ResponseWriter, dispatcher *deploy.Dispatcher, w
 		status = successStatus
 	}
 	writeJSON(w, status, volumeOpResponse{
-		Success: result.GetSuccess(),
-		Error:   result.GetErrorMessage(),
-		Name:    result.GetName(),
+		Success:        result.GetSuccess(),
+		Error:          result.GetErrorMessage(),
+		Name:           result.GetName(),
+		ReclaimedBytes: result.GetReclaimedBytes(),
+		RemovedCount:   result.GetRemovedCount(),
 	})
 }
 
@@ -287,6 +291,35 @@ func handleRemoveVolume(log *slog.Logger, dispatcher *deploy.Dispatcher, waiter 
 			},
 		}
 		writeVolumeOpResult(w, dispatcher, waiter, serverID, requestID, cmd, volumeOpTimeout, http.StatusOK)
+	}
+}
+
+// handlePruneVolumes removes unused anonymous volumes (or, with all:true,
+// unused named ones too) on serverID and reports what was reclaimed.
+// Deployment volumes are always kept — see PruneVolumes in
+// internal/agent/docker/volumes.go.
+func handlePruneVolumes(log *slog.Logger, dispatcher *deploy.Dispatcher, waiter *deploy.VolumeOpWaiter) http.HandlerFunc {
+	type request struct {
+		All bool `json:"all,omitempty"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		serverID := r.PathValue("id")
+
+		var req request
+		_ = json.NewDecoder(r.Body).Decode(&req)
+
+		requestID, ok := newRequestID(w, log)
+		if !ok {
+			return
+		}
+
+		cmd := &agentv1.ControlMessage{
+			Payload: &agentv1.ControlMessage_PruneVolumes{
+				PruneVolumes: &agentv1.PruneVolumesCommand{RequestId: requestID, ServerId: serverID, All: req.All},
+			},
+		}
+		writeVolumeOpResult(w, dispatcher, waiter, serverID, requestID, cmd, pruneOpTimeout, http.StatusOK)
 	}
 }
 

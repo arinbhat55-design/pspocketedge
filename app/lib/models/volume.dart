@@ -73,8 +73,8 @@ class VolumeFileEntry {
       );
 }
 
-/// Result of a volume create/remove command that completed its round trip
-/// to the agent. A remove blocked by the in-use guard (see
+/// Result of a volume create/remove/prune command that completed its round
+/// trip to the agent. A remove blocked by the in-use guard (see
 /// internal/agent/docker/volumes.go's RemoveVolume) comes back as
 /// success:false with [error] describing which containers are using it —
 /// the caller offers to retry with force in that case, not a transport
@@ -84,13 +84,25 @@ class VolumeOpResult {
   final String? error;
   final String? name;
 
-  const VolumeOpResult({required this.success, this.error, this.name});
+  /// Only set by a prune.
+  final int reclaimedBytes;
+  final int removedCount;
+
+  const VolumeOpResult({
+    required this.success,
+    this.error,
+    this.name,
+    this.reclaimedBytes = 0,
+    this.removedCount = 0,
+  });
 
   factory VolumeOpResult.fromJson(Map<String, dynamic> json) {
     return VolumeOpResult(
       success: json['success'] as bool? ?? false,
       error: json['error'] as String?,
       name: json['name'] as String?,
+      reclaimedBytes: (json['reclaimedBytes'] as num?)?.toInt() ?? 0,
+      removedCount: (json['removedCount'] as num?)?.toInt() ?? 0,
     );
   }
 }

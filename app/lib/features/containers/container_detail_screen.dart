@@ -12,6 +12,7 @@ import 'container_resources_screen.dart';
 import 'container_schedules_screen.dart';
 import 'container_terminal_screen.dart';
 import 'recreate_container_dialog.dart';
+import 'remove_container_dialog.dart';
 import 'rename_container_dialog.dart';
 import 'resource_limits_dialog.dart';
 import 'restart_policy_dialog.dart';
@@ -180,7 +181,11 @@ class _ContainerDetailScreenState extends State<ContainerDetailScreen>
     return '${d.inMinutes}m';
   }
 
-  Future<void> _runAction(String action, {bool force = false}) async {
+  Future<void> _runAction(
+    String action, {
+    bool force = false,
+    bool removeVolumes = false,
+  }) async {
     setState(() => _busy = true);
     try {
       final result = await widget.apiClient.containerAction(
@@ -188,6 +193,7 @@ class _ContainerDetailScreenState extends State<ContainerDetailScreen>
         widget.container.containerId,
         action,
         force: force,
+        removeVolumes: removeVolumes,
       );
       if (!mounted) return;
       if (!result.success) {
@@ -217,19 +223,23 @@ class _ContainerDetailScreenState extends State<ContainerDetailScreen>
   }
 
   Future<void> _confirmAndRun(String action, {bool force = false}) async {
+    if (action == 'remove') {
+      final choice = await showRemoveContainerDialog(
+        context,
+        stopsRunning: force,
+      );
+      if (choice != null) {
+        _runAction(action, force: force, removeVolumes: choice.removeVolumes);
+      }
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text(
-          action == 'kill' ? 'Force-kill container?' : 'Remove container?',
-        ),
-        content: Text(
-          action == 'kill'
-              ? 'Sends SIGKILL immediately, with no graceful shutdown. Use for an '
-                    'unresponsive container.'
-              : 'This permanently deletes the container'
-                    '${force ? ' (forced — it will be stopped first if running)' : ''}. '
-                    'Any data outside a named volume is lost.',
+        title: const Text('Force-kill container?'),
+        content: const Text(
+          'Sends SIGKILL immediately, with no graceful shutdown. Use for an '
+          'unresponsive container.',
         ),
         actions: [
           TextButton(
@@ -239,7 +249,7 @@ class _ContainerDetailScreenState extends State<ContainerDetailScreen>
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.failed),
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text(action == 'kill' ? 'Force-kill' : 'Remove'),
+            child: const Text('Force-kill'),
           ),
         ],
       ),

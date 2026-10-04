@@ -105,20 +105,29 @@ func (r *Runner) handleListVolumes(ctx context.Context, dockerCli *dockerclient.
 
 func (r *Runner) handleCreateVolume(ctx context.Context, dockerCli *dockerclient.Client, cmd *agentv1.CreateVolumeCommand, outbound chan<- *agentv1.AgentMessage) {
 	if dockerCli == nil {
-		r.replyVolumeOp(ctx, outbound, cmd.GetRequestId(), cmd.GetName(), errors.New("docker client unavailable on this agent"))
+		r.replyVolumeOp(ctx, outbound, cmd.GetRequestId(), cmd.GetName(), docker.VolumePruneReport{}, errors.New("docker client unavailable on this agent"))
 		return
 	}
 	err := docker.CreateVolume(ctx, dockerCli, cmd.GetName(), cmd.GetDriver(), cmd.GetLabels())
-	r.replyVolumeOp(ctx, outbound, cmd.GetRequestId(), cmd.GetName(), err)
+	r.replyVolumeOp(ctx, outbound, cmd.GetRequestId(), cmd.GetName(), docker.VolumePruneReport{}, err)
 }
 
 func (r *Runner) handleRemoveVolume(ctx context.Context, dockerCli *dockerclient.Client, cmd *agentv1.RemoveVolumeCommand, outbound chan<- *agentv1.AgentMessage) {
 	if dockerCli == nil {
-		r.replyVolumeOp(ctx, outbound, cmd.GetRequestId(), cmd.GetName(), errors.New("docker client unavailable on this agent"))
+		r.replyVolumeOp(ctx, outbound, cmd.GetRequestId(), cmd.GetName(), docker.VolumePruneReport{}, errors.New("docker client unavailable on this agent"))
 		return
 	}
 	err := docker.RemoveVolume(ctx, dockerCli, cmd.GetName(), cmd.GetForce())
-	r.replyVolumeOp(ctx, outbound, cmd.GetRequestId(), cmd.GetName(), err)
+	r.replyVolumeOp(ctx, outbound, cmd.GetRequestId(), cmd.GetName(), docker.VolumePruneReport{}, err)
+}
+
+func (r *Runner) handlePruneVolumes(ctx context.Context, dockerCli *dockerclient.Client, cmd *agentv1.PruneVolumesCommand, outbound chan<- *agentv1.AgentMessage) {
+	if dockerCli == nil {
+		r.replyVolumeOp(ctx, outbound, cmd.GetRequestId(), "", docker.VolumePruneReport{}, errors.New("docker client unavailable on this agent"))
+		return
+	}
+	report, err := docker.PruneVolumes(ctx, dockerCli, cmd.GetAll())
+	r.replyVolumeOp(ctx, outbound, cmd.GetRequestId(), "", report, err)
 }
 
 func (r *Runner) handleInspectVolume(ctx context.Context, dockerCli *dockerclient.Client, cmd *agentv1.InspectVolumeCommand, outbound chan<- *agentv1.AgentMessage) {
@@ -138,9 +147,9 @@ func (r *Runner) handleInspectVolume(ctx context.Context, dockerCli *dockerclien
 
 // replyVolumeOp sends a VolumeOpResult for requestID onto outbound, success
 // iff err is nil — the volume-op counterpart to replyNetworkOp above.
-func (r *Runner) replyVolumeOp(ctx context.Context, outbound chan<- *agentv1.AgentMessage, requestID, name string, err error) {
+func (r *Runner) replyVolumeOp(ctx context.Context, outbound chan<- *agentv1.AgentMessage, requestID, name string, pruned docker.VolumePruneReport, err error) {
 	select {
-	case outbound <- volumeOpResultMessage(requestID, name, err):
+	case outbound <- volumeOpResultMessage(requestID, name, pruned, err):
 	case <-ctx.Done():
 	}
 }
@@ -257,11 +266,13 @@ func volumeDetailMessage(requestID string, d docker.VolumeDetail) *agentv1.Agent
 	}
 }
 
-func volumeOpResultMessage(requestID, name string, err error) *agentv1.AgentMessage {
+func volumeOpResultMessage(requestID, name string, pruned docker.VolumePruneReport, err error) *agentv1.AgentMessage {
 	result := &agentv1.VolumeOpResult{
-		RequestId: requestID,
-		Success:   err == nil,
-		Name:      name,
+		RequestId:      requestID,
+		Success:        err == nil,
+		Name:           name,
+		ReclaimedBytes: pruned.ReclaimedBytes,
+		RemovedCount:   int32(pruned.Removed),
 	}
 	if err != nil {
 		result.ErrorMessage = err.Error()

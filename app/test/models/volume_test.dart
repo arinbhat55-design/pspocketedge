@@ -54,6 +54,19 @@ void main() {
       expect(result.success, isFalse);
       expect(result.error, contains('in use'));
       expect(result.name, 'data');
+      expect(result.removedCount, 0);
+      expect(result.reclaimedBytes, 0);
+    });
+
+    test('parses a prune summary', () {
+      final result = VolumeOpResult.fromJson({
+        'success': true,
+        'reclaimedBytes': 2048,
+        'removedCount': 3,
+      });
+      expect(result.success, isTrue);
+      expect(result.removedCount, 3);
+      expect(result.reclaimedBytes, 2048);
     });
   });
 

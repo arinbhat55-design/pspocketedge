@@ -387,6 +387,8 @@ func (r *Runner) runSession(ctx context.Context, client agentv1.AgentSessionClie
 				go r.handleRemoveImage(sessionCtx, dockerCli, msg.GetRemoveImage(), outbound)
 			case msg.GetPruneImages() != nil:
 				go r.handlePruneImages(sessionCtx, dockerCli, msg.GetPruneImages(), outbound)
+			case msg.GetPruneBuildCache() != nil:
+				go r.handlePruneBuildCache(sessionCtx, dockerCli, msg.GetPruneBuildCache(), outbound)
 			case msg.GetStreamLogs() != nil:
 				go r.handleStreamLogs(sessionCtx, dockerCli, msg.GetStreamLogs(), outbound, streams)
 			case msg.GetListEvents() != nil:
@@ -413,6 +415,8 @@ func (r *Runner) runSession(ctx context.Context, client agentv1.AgentSessionClie
 				go r.handleCreateVolume(sessionCtx, dockerCli, msg.GetCreateVolume(), outbound)
 			case msg.GetRemoveVolume() != nil:
 				go r.handleRemoveVolume(sessionCtx, dockerCli, msg.GetRemoveVolume(), outbound)
+			case msg.GetPruneVolumes() != nil:
+				go r.handlePruneVolumes(sessionCtx, dockerCli, msg.GetPruneVolumes(), outbound)
 			case msg.GetInspectVolume() != nil:
 				go r.handleInspectVolume(sessionCtx, dockerCli, msg.GetInspectVolume(), outbound)
 			case msg.GetVolumeFile() != nil:
@@ -714,7 +718,7 @@ func (r *Runner) handleContainerAction(ctx context.Context, dockerCli *dockercli
 		r.replyOp(ctx, outbound, cmd.GetRequestId(), cmd.GetContainerId(), errors.New("docker client unavailable on this agent"))
 		return
 	}
-	err := docker.ContainerAction(ctx, dockerCli, cmd.GetContainerId(), cmd.GetAction(), cmd.GetTimeoutSeconds(), cmd.GetForce())
+	err := docker.ContainerAction(ctx, dockerCli, cmd.GetContainerId(), cmd.GetAction(), cmd.GetTimeoutSeconds(), cmd.GetForce(), cmd.GetRemoveVolumes())
 	r.replyOp(ctx, outbound, cmd.GetRequestId(), cmd.GetContainerId(), err)
 }
 
@@ -894,6 +898,15 @@ func (r *Runner) handlePruneImages(ctx context.Context, dockerCli *dockerclient.
 		return
 	}
 	reclaimed, err := docker.PruneImages(ctx, dockerCli, cmd.GetAll())
+	r.replyImageOp(ctx, outbound, cmd.GetRequestId(), "", reclaimed, err)
+}
+
+func (r *Runner) handlePruneBuildCache(ctx context.Context, dockerCli *dockerclient.Client, cmd *agentv1.PruneBuildCacheCommand, outbound chan<- *agentv1.AgentMessage) {
+	if dockerCli == nil {
+		r.replyImageOp(ctx, outbound, cmd.GetRequestId(), "", 0, errors.New("docker client unavailable on this agent"))
+		return
+	}
+	reclaimed, err := docker.PruneBuildCache(ctx, dockerCli, cmd.GetAll())
 	r.replyImageOp(ctx, outbound, cmd.GetRequestId(), "", reclaimed, err)
 }
 

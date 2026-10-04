@@ -226,6 +226,39 @@ class _ImageListScreenState extends State<ImageListScreen> {
     }
   }
 
+  /// Clears all unused build cache on the selected server. Safe to run any
+  /// time: the next build of each image just runs without cache.
+  Future<void> _pruneBuildCache() async {
+    final serverId = _selectedServerId;
+    if (serverId == null) return;
+
+    setState(() => _pruning = true);
+    try {
+      final result = await widget.apiClient.pruneBuildCache(
+        serverId,
+        all: true,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.success
+                ? 'Build cache cleared, reclaimed ${formatBytes(result.reclaimedBytes)}'
+                : result.error ?? 'Clearing build cache failed',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Clearing build cache failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _pruning = false);
+    }
+  }
+
   PrimaryAction get _pullAction => PrimaryAction(
     label: 'Pull image',
     icon: Icons.download,
@@ -353,6 +386,11 @@ class _ImageListScreenState extends State<ImageListScreen> {
                                   : () => _prune(all: true),
                               icon: const Icon(Icons.delete_sweep, size: 16),
                               label: const Text('Prune all unused'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _pruning ? null : _pruneBuildCache,
+                              icon: const Icon(Icons.layers_clear, size: 16),
+                              label: const Text('Clear build cache'),
                             ),
                           ],
                         ],

@@ -797,6 +797,8 @@ type ControlMessage struct {
 	//	*ControlMessage_BuildImage
 	//	*ControlMessage_PushImage
 	//	*ControlMessage_VolumeFile
+	//	*ControlMessage_PruneVolumes
+	//	*ControlMessage_PruneBuildCache
 	Payload       isControlMessage_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1163,6 +1165,24 @@ func (x *ControlMessage) GetVolumeFile() *VolumeFileCommand {
 	return nil
 }
 
+func (x *ControlMessage) GetPruneVolumes() *PruneVolumesCommand {
+	if x != nil {
+		if x, ok := x.Payload.(*ControlMessage_PruneVolumes); ok {
+			return x.PruneVolumes
+		}
+	}
+	return nil
+}
+
+func (x *ControlMessage) GetPruneBuildCache() *PruneBuildCacheCommand {
+	if x != nil {
+		if x, ok := x.Payload.(*ControlMessage_PruneBuildCache); ok {
+			return x.PruneBuildCache
+		}
+	}
+	return nil
+}
+
 type isControlMessage_Payload interface {
 	isControlMessage_Payload()
 }
@@ -1311,6 +1331,14 @@ type ControlMessage_VolumeFile struct {
 	VolumeFile *VolumeFileCommand `protobuf:"bytes,36,opt,name=volume_file,json=volumeFile,proto3,oneof"`
 }
 
+type ControlMessage_PruneVolumes struct {
+	PruneVolumes *PruneVolumesCommand `protobuf:"bytes,37,opt,name=prune_volumes,json=pruneVolumes,proto3,oneof"`
+}
+
+type ControlMessage_PruneBuildCache struct {
+	PruneBuildCache *PruneBuildCacheCommand `protobuf:"bytes,38,opt,name=prune_build_cache,json=pruneBuildCache,proto3,oneof"`
+}
+
 func (*ControlMessage_DeployStack) isControlMessage_Payload() {}
 
 func (*ControlMessage_Ack) isControlMessage_Payload() {}
@@ -1382,6 +1410,10 @@ func (*ControlMessage_BuildImage) isControlMessage_Payload() {}
 func (*ControlMessage_PushImage) isControlMessage_Payload() {}
 
 func (*ControlMessage_VolumeFile) isControlMessage_Payload() {}
+
+func (*ControlMessage_PruneVolumes) isControlMessage_Payload() {}
+
+func (*ControlMessage_PruneBuildCache) isControlMessage_Payload() {}
 
 type Heartbeat struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
@@ -3452,6 +3484,7 @@ type ContainerActionCommand struct {
 	Action         ContainerAction        `protobuf:"varint,4,opt,name=action,proto3,enum=agent.v1.ContainerAction" json:"action,omitempty"`
 	TimeoutSeconds int32                  `protobuf:"varint,5,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"` // graceful stop/restart timeout; 0 = agent default
 	Force          bool                   `protobuf:"varint,6,opt,name=force,proto3" json:"force,omitempty"`                                         // for REMOVE: remove even if running
+	RemoveVolumes  bool                   `protobuf:"varint,7,opt,name=remove_volumes,json=removeVolumes,proto3" json:"remove_volumes,omitempty"`    // for REMOVE: also remove its anonymous volumes (docker rm -v)
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -3524,6 +3557,13 @@ func (x *ContainerActionCommand) GetTimeoutSeconds() int32 {
 func (x *ContainerActionCommand) GetForce() bool {
 	if x != nil {
 		return x.Force
+	}
+	return false
+}
+
+func (x *ContainerActionCommand) GetRemoveVolumes() bool {
+	if x != nil {
+		return x.RemoveVolumes
 	}
 	return false
 }
@@ -4835,10 +4875,74 @@ func (x *PruneImagesCommand) GetAll() bool {
 	return false
 }
 
+// PruneBuildCacheCommand clears the builder's cache. all=false removes only
+// dangling cache records (docker builder prune); all=true removes every
+// cache record not in use by a running build (docker builder prune -a).
+type PruneBuildCacheCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	ServerId      string                 `protobuf:"bytes,2,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	All           bool                   `protobuf:"varint,3,opt,name=all,proto3" json:"all,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PruneBuildCacheCommand) Reset() {
+	*x = PruneBuildCacheCommand{}
+	mi := &file_agent_v1_agent_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PruneBuildCacheCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PruneBuildCacheCommand) ProtoMessage() {}
+
+func (x *PruneBuildCacheCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_agent_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PruneBuildCacheCommand.ProtoReflect.Descriptor instead.
+func (*PruneBuildCacheCommand) Descriptor() ([]byte, []int) {
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *PruneBuildCacheCommand) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *PruneBuildCacheCommand) GetServerId() string {
+	if x != nil {
+		return x.ServerId
+	}
+	return ""
+}
+
+func (x *PruneBuildCacheCommand) GetAll() bool {
+	if x != nil {
+		return x.All
+	}
+	return false
+}
+
 // ImageOpResult answers PullImageCommand, PushImageCommand,
-// RemoveImageCommand, and PruneImagesCommand alike, correlated via request_id — same one-request/
-// one-reply pattern ContainerOpResult already uses for container ops.
-// reclaimed_bytes is only meaningful for PruneImagesCommand.
+// RemoveImageCommand, PruneImagesCommand, and PruneBuildCacheCommand alike,
+// correlated via request_id — same one-request/one-reply pattern
+// ContainerOpResult already uses for container ops. reclaimed_bytes is only
+// meaningful for the two prune commands.
 type ImageOpResult struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	RequestId      string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -4852,7 +4956,7 @@ type ImageOpResult struct {
 
 func (x *ImageOpResult) Reset() {
 	*x = ImageOpResult{}
-	mi := &file_agent_v1_agent_proto_msgTypes[45]
+	mi := &file_agent_v1_agent_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4864,7 +4968,7 @@ func (x *ImageOpResult) String() string {
 func (*ImageOpResult) ProtoMessage() {}
 
 func (x *ImageOpResult) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[45]
+	mi := &file_agent_v1_agent_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4877,7 +4981,7 @@ func (x *ImageOpResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImageOpResult.ProtoReflect.Descriptor instead.
 func (*ImageOpResult) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{45}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ImageOpResult) GetRequestId() string {
@@ -4934,7 +5038,7 @@ type NetworkSummary struct {
 
 func (x *NetworkSummary) Reset() {
 	*x = NetworkSummary{}
-	mi := &file_agent_v1_agent_proto_msgTypes[46]
+	mi := &file_agent_v1_agent_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4946,7 +5050,7 @@ func (x *NetworkSummary) String() string {
 func (*NetworkSummary) ProtoMessage() {}
 
 func (x *NetworkSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[46]
+	mi := &file_agent_v1_agent_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4959,7 +5063,7 @@ func (x *NetworkSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NetworkSummary.ProtoReflect.Descriptor instead.
 func (*NetworkSummary) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{46}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *NetworkSummary) GetId() string {
@@ -5025,7 +5129,7 @@ type ListNetworksCommand struct {
 
 func (x *ListNetworksCommand) Reset() {
 	*x = ListNetworksCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[47]
+	mi := &file_agent_v1_agent_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5037,7 +5141,7 @@ func (x *ListNetworksCommand) String() string {
 func (*ListNetworksCommand) ProtoMessage() {}
 
 func (x *ListNetworksCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[47]
+	mi := &file_agent_v1_agent_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5050,7 +5154,7 @@ func (x *ListNetworksCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListNetworksCommand.ProtoReflect.Descriptor instead.
 func (*ListNetworksCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{47}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *ListNetworksCommand) GetRequestId() string {
@@ -5077,7 +5181,7 @@ type NetworkListResult struct {
 
 func (x *NetworkListResult) Reset() {
 	*x = NetworkListResult{}
-	mi := &file_agent_v1_agent_proto_msgTypes[48]
+	mi := &file_agent_v1_agent_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5089,7 +5193,7 @@ func (x *NetworkListResult) String() string {
 func (*NetworkListResult) ProtoMessage() {}
 
 func (x *NetworkListResult) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[48]
+	mi := &file_agent_v1_agent_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5102,7 +5206,7 @@ func (x *NetworkListResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NetworkListResult.ProtoReflect.Descriptor instead.
 func (*NetworkListResult) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{48}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *NetworkListResult) GetRequestId() string {
@@ -5133,7 +5237,7 @@ type CreateNetworkCommand struct {
 
 func (x *CreateNetworkCommand) Reset() {
 	*x = CreateNetworkCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[49]
+	mi := &file_agent_v1_agent_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5145,7 +5249,7 @@ func (x *CreateNetworkCommand) String() string {
 func (*CreateNetworkCommand) ProtoMessage() {}
 
 func (x *CreateNetworkCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[49]
+	mi := &file_agent_v1_agent_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5158,7 +5262,7 @@ func (x *CreateNetworkCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateNetworkCommand.ProtoReflect.Descriptor instead.
 func (*CreateNetworkCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{49}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *CreateNetworkCommand) GetRequestId() string {
@@ -5214,7 +5318,7 @@ type RemoveNetworkCommand struct {
 
 func (x *RemoveNetworkCommand) Reset() {
 	*x = RemoveNetworkCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[50]
+	mi := &file_agent_v1_agent_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5226,7 +5330,7 @@ func (x *RemoveNetworkCommand) String() string {
 func (*RemoveNetworkCommand) ProtoMessage() {}
 
 func (x *RemoveNetworkCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[50]
+	mi := &file_agent_v1_agent_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5239,7 +5343,7 @@ func (x *RemoveNetworkCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveNetworkCommand.ProtoReflect.Descriptor instead.
 func (*RemoveNetworkCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{50}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *RemoveNetworkCommand) GetRequestId() string {
@@ -5275,7 +5379,7 @@ type ConnectContainerToNetworkCommand struct {
 
 func (x *ConnectContainerToNetworkCommand) Reset() {
 	*x = ConnectContainerToNetworkCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[51]
+	mi := &file_agent_v1_agent_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5287,7 +5391,7 @@ func (x *ConnectContainerToNetworkCommand) String() string {
 func (*ConnectContainerToNetworkCommand) ProtoMessage() {}
 
 func (x *ConnectContainerToNetworkCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[51]
+	mi := &file_agent_v1_agent_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5300,7 +5404,7 @@ func (x *ConnectContainerToNetworkCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnectContainerToNetworkCommand.ProtoReflect.Descriptor instead.
 func (*ConnectContainerToNetworkCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{51}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *ConnectContainerToNetworkCommand) GetRequestId() string {
@@ -5344,7 +5448,7 @@ type DisconnectContainerFromNetworkCommand struct {
 
 func (x *DisconnectContainerFromNetworkCommand) Reset() {
 	*x = DisconnectContainerFromNetworkCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[52]
+	mi := &file_agent_v1_agent_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5356,7 +5460,7 @@ func (x *DisconnectContainerFromNetworkCommand) String() string {
 func (*DisconnectContainerFromNetworkCommand) ProtoMessage() {}
 
 func (x *DisconnectContainerFromNetworkCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[52]
+	mi := &file_agent_v1_agent_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5369,7 +5473,7 @@ func (x *DisconnectContainerFromNetworkCommand) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use DisconnectContainerFromNetworkCommand.ProtoReflect.Descriptor instead.
 func (*DisconnectContainerFromNetworkCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{52}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *DisconnectContainerFromNetworkCommand) GetRequestId() string {
@@ -5423,7 +5527,7 @@ type NetworkOpResult struct {
 
 func (x *NetworkOpResult) Reset() {
 	*x = NetworkOpResult{}
-	mi := &file_agent_v1_agent_proto_msgTypes[53]
+	mi := &file_agent_v1_agent_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5435,7 +5539,7 @@ func (x *NetworkOpResult) String() string {
 func (*NetworkOpResult) ProtoMessage() {}
 
 func (x *NetworkOpResult) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[53]
+	mi := &file_agent_v1_agent_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5448,7 +5552,7 @@ func (x *NetworkOpResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NetworkOpResult.ProtoReflect.Descriptor instead.
 func (*NetworkOpResult) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{53}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *NetworkOpResult) GetRequestId() string {
@@ -5499,7 +5603,7 @@ type VolumeSummary struct {
 
 func (x *VolumeSummary) Reset() {
 	*x = VolumeSummary{}
-	mi := &file_agent_v1_agent_proto_msgTypes[54]
+	mi := &file_agent_v1_agent_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5511,7 +5615,7 @@ func (x *VolumeSummary) String() string {
 func (*VolumeSummary) ProtoMessage() {}
 
 func (x *VolumeSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[54]
+	mi := &file_agent_v1_agent_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5524,7 +5628,7 @@ func (x *VolumeSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VolumeSummary.ProtoReflect.Descriptor instead.
 func (*VolumeSummary) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{54}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *VolumeSummary) GetName() string {
@@ -5588,7 +5692,7 @@ type ListVolumesCommand struct {
 
 func (x *ListVolumesCommand) Reset() {
 	*x = ListVolumesCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[55]
+	mi := &file_agent_v1_agent_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5600,7 +5704,7 @@ func (x *ListVolumesCommand) String() string {
 func (*ListVolumesCommand) ProtoMessage() {}
 
 func (x *ListVolumesCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[55]
+	mi := &file_agent_v1_agent_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5613,7 +5717,7 @@ func (x *ListVolumesCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListVolumesCommand.ProtoReflect.Descriptor instead.
 func (*ListVolumesCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{55}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *ListVolumesCommand) GetRequestId() string {
@@ -5640,7 +5744,7 @@ type VolumeListResult struct {
 
 func (x *VolumeListResult) Reset() {
 	*x = VolumeListResult{}
-	mi := &file_agent_v1_agent_proto_msgTypes[56]
+	mi := &file_agent_v1_agent_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5652,7 +5756,7 @@ func (x *VolumeListResult) String() string {
 func (*VolumeListResult) ProtoMessage() {}
 
 func (x *VolumeListResult) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[56]
+	mi := &file_agent_v1_agent_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5665,7 +5769,7 @@ func (x *VolumeListResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VolumeListResult.ProtoReflect.Descriptor instead.
 func (*VolumeListResult) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{56}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *VolumeListResult) GetRequestId() string {
@@ -5695,7 +5799,7 @@ type CreateVolumeCommand struct {
 
 func (x *CreateVolumeCommand) Reset() {
 	*x = CreateVolumeCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[57]
+	mi := &file_agent_v1_agent_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5707,7 +5811,7 @@ func (x *CreateVolumeCommand) String() string {
 func (*CreateVolumeCommand) ProtoMessage() {}
 
 func (x *CreateVolumeCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[57]
+	mi := &file_agent_v1_agent_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5720,7 +5824,7 @@ func (x *CreateVolumeCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateVolumeCommand.ProtoReflect.Descriptor instead.
 func (*CreateVolumeCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{57}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *CreateVolumeCommand) GetRequestId() string {
@@ -5775,7 +5879,7 @@ type RemoveVolumeCommand struct {
 
 func (x *RemoveVolumeCommand) Reset() {
 	*x = RemoveVolumeCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[58]
+	mi := &file_agent_v1_agent_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5787,7 +5891,7 @@ func (x *RemoveVolumeCommand) String() string {
 func (*RemoveVolumeCommand) ProtoMessage() {}
 
 func (x *RemoveVolumeCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[58]
+	mi := &file_agent_v1_agent_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5800,7 +5904,7 @@ func (x *RemoveVolumeCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveVolumeCommand.ProtoReflect.Descriptor instead.
 func (*RemoveVolumeCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{58}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *RemoveVolumeCommand) GetRequestId() string {
@@ -5831,6 +5935,70 @@ func (x *RemoveVolumeCommand) GetForce() bool {
 	return false
 }
 
+// PruneVolumesCommand removes volumes no container references. all=false
+// removes only anonymous volumes (docker volume prune); all=true also
+// removes unused named volumes (docker volume prune -a). Deployment
+// volumes are always kept, since a redeploy or restore reattaches them.
+type PruneVolumesCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	ServerId      string                 `protobuf:"bytes,2,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	All           bool                   `protobuf:"varint,3,opt,name=all,proto3" json:"all,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PruneVolumesCommand) Reset() {
+	*x = PruneVolumesCommand{}
+	mi := &file_agent_v1_agent_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PruneVolumesCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PruneVolumesCommand) ProtoMessage() {}
+
+func (x *PruneVolumesCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_agent_v1_agent_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PruneVolumesCommand.ProtoReflect.Descriptor instead.
+func (*PruneVolumesCommand) Descriptor() ([]byte, []int) {
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *PruneVolumesCommand) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *PruneVolumesCommand) GetServerId() string {
+	if x != nil {
+		return x.ServerId
+	}
+	return ""
+}
+
+func (x *PruneVolumesCommand) GetAll() bool {
+	if x != nil {
+		return x.All
+	}
+	return false
+}
+
 type InspectVolumeCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -5842,7 +6010,7 @@ type InspectVolumeCommand struct {
 
 func (x *InspectVolumeCommand) Reset() {
 	*x = InspectVolumeCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[59]
+	mi := &file_agent_v1_agent_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5854,7 +6022,7 @@ func (x *InspectVolumeCommand) String() string {
 func (*InspectVolumeCommand) ProtoMessage() {}
 
 func (x *InspectVolumeCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[59]
+	mi := &file_agent_v1_agent_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5867,7 +6035,7 @@ func (x *InspectVolumeCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InspectVolumeCommand.ProtoReflect.Descriptor instead.
 func (*InspectVolumeCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{59}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *InspectVolumeCommand) GetRequestId() string {
@@ -5903,7 +6071,7 @@ type VolumeDetail struct {
 
 func (x *VolumeDetail) Reset() {
 	*x = VolumeDetail{}
-	mi := &file_agent_v1_agent_proto_msgTypes[60]
+	mi := &file_agent_v1_agent_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5915,7 +6083,7 @@ func (x *VolumeDetail) String() string {
 func (*VolumeDetail) ProtoMessage() {}
 
 func (x *VolumeDetail) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[60]
+	mi := &file_agent_v1_agent_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5928,7 +6096,7 @@ func (x *VolumeDetail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VolumeDetail.ProtoReflect.Descriptor instead.
 func (*VolumeDetail) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{60}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *VolumeDetail) GetRequestId() string {
@@ -5959,21 +6127,25 @@ func (x *VolumeDetail) GetVolume() *VolumeSummary {
 	return nil
 }
 
-// VolumeOpResult answers CreateVolumeCommand and RemoveVolumeCommand alike,
-// correlated via request_id — same pattern as NetworkOpResult above.
+// VolumeOpResult answers CreateVolumeCommand, RemoveVolumeCommand, and
+// PruneVolumesCommand alike, correlated via request_id — same pattern as
+// NetworkOpResult above. reclaimed_bytes and removed_count are only
+// meaningful for PruneVolumesCommand.
 type VolumeOpResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Success       bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
-	ErrorMessage  string                 `protobuf:"bytes,3,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
-	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	RequestId      string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Success        bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
+	ErrorMessage   string                 `protobuf:"bytes,3,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	Name           string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	ReclaimedBytes int64                  `protobuf:"varint,5,opt,name=reclaimed_bytes,json=reclaimedBytes,proto3" json:"reclaimed_bytes,omitempty"`
+	RemovedCount   int32                  `protobuf:"varint,6,opt,name=removed_count,json=removedCount,proto3" json:"removed_count,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *VolumeOpResult) Reset() {
 	*x = VolumeOpResult{}
-	mi := &file_agent_v1_agent_proto_msgTypes[61]
+	mi := &file_agent_v1_agent_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5985,7 +6157,7 @@ func (x *VolumeOpResult) String() string {
 func (*VolumeOpResult) ProtoMessage() {}
 
 func (x *VolumeOpResult) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[61]
+	mi := &file_agent_v1_agent_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5998,7 +6170,7 @@ func (x *VolumeOpResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VolumeOpResult.ProtoReflect.Descriptor instead.
 func (*VolumeOpResult) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{61}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *VolumeOpResult) GetRequestId() string {
@@ -6029,6 +6201,20 @@ func (x *VolumeOpResult) GetName() string {
 	return ""
 }
 
+func (x *VolumeOpResult) GetReclaimedBytes() int64 {
+	if x != nil {
+		return x.ReclaimedBytes
+	}
+	return 0
+}
+
+func (x *VolumeOpResult) GetRemovedCount() int32 {
+	if x != nil {
+		return x.RemovedCount
+	}
+	return 0
+}
+
 // VolumeFileCommand operates inside a named volume through a temporary
 // helper container. Paths are relative to the volume root. Content reads
 // and writes are bounded to 1 MiB; clone streams between Docker containers.
@@ -6047,7 +6233,7 @@ type VolumeFileCommand struct {
 
 func (x *VolumeFileCommand) Reset() {
 	*x = VolumeFileCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[62]
+	mi := &file_agent_v1_agent_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6059,7 +6245,7 @@ func (x *VolumeFileCommand) String() string {
 func (*VolumeFileCommand) ProtoMessage() {}
 
 func (x *VolumeFileCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[62]
+	mi := &file_agent_v1_agent_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6072,7 +6258,7 @@ func (x *VolumeFileCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VolumeFileCommand.ProtoReflect.Descriptor instead.
 func (*VolumeFileCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{62}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *VolumeFileCommand) GetRequestId() string {
@@ -6136,7 +6322,7 @@ type VolumeFileEntry struct {
 
 func (x *VolumeFileEntry) Reset() {
 	*x = VolumeFileEntry{}
-	mi := &file_agent_v1_agent_proto_msgTypes[63]
+	mi := &file_agent_v1_agent_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6148,7 +6334,7 @@ func (x *VolumeFileEntry) String() string {
 func (*VolumeFileEntry) ProtoMessage() {}
 
 func (x *VolumeFileEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[63]
+	mi := &file_agent_v1_agent_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6161,7 +6347,7 @@ func (x *VolumeFileEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VolumeFileEntry.ProtoReflect.Descriptor instead.
 func (*VolumeFileEntry) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{63}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *VolumeFileEntry) GetName() string {
@@ -6205,7 +6391,7 @@ type VolumeFileResult struct {
 
 func (x *VolumeFileResult) Reset() {
 	*x = VolumeFileResult{}
-	mi := &file_agent_v1_agent_proto_msgTypes[64]
+	mi := &file_agent_v1_agent_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6217,7 +6403,7 @@ func (x *VolumeFileResult) String() string {
 func (*VolumeFileResult) ProtoMessage() {}
 
 func (x *VolumeFileResult) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[64]
+	mi := &file_agent_v1_agent_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6230,7 +6416,7 @@ func (x *VolumeFileResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VolumeFileResult.ProtoReflect.Descriptor instead.
 func (*VolumeFileResult) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{64}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *VolumeFileResult) GetRequestId() string {
@@ -6291,7 +6477,7 @@ type StreamLogsCommand struct {
 
 func (x *StreamLogsCommand) Reset() {
 	*x = StreamLogsCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[65]
+	mi := &file_agent_v1_agent_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6303,7 +6489,7 @@ func (x *StreamLogsCommand) String() string {
 func (*StreamLogsCommand) ProtoMessage() {}
 
 func (x *StreamLogsCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[65]
+	mi := &file_agent_v1_agent_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6316,7 +6502,7 @@ func (x *StreamLogsCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamLogsCommand.ProtoReflect.Descriptor instead.
 func (*StreamLogsCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{65}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *StreamLogsCommand) GetRequestId() string {
@@ -6382,7 +6568,7 @@ type StopStreamCommand struct {
 
 func (x *StopStreamCommand) Reset() {
 	*x = StopStreamCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[66]
+	mi := &file_agent_v1_agent_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6394,7 +6580,7 @@ func (x *StopStreamCommand) String() string {
 func (*StopStreamCommand) ProtoMessage() {}
 
 func (x *StopStreamCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[66]
+	mi := &file_agent_v1_agent_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6407,7 +6593,7 @@ func (x *StopStreamCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopStreamCommand.ProtoReflect.Descriptor instead.
 func (*StopStreamCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{66}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *StopStreamCommand) GetRequestId() string {
@@ -6428,7 +6614,7 @@ type LogLine struct {
 
 func (x *LogLine) Reset() {
 	*x = LogLine{}
-	mi := &file_agent_v1_agent_proto_msgTypes[67]
+	mi := &file_agent_v1_agent_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6440,7 +6626,7 @@ func (x *LogLine) String() string {
 func (*LogLine) ProtoMessage() {}
 
 func (x *LogLine) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[67]
+	mi := &file_agent_v1_agent_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6453,7 +6639,7 @@ func (x *LogLine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogLine.ProtoReflect.Descriptor instead.
 func (*LogLine) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{67}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *LogLine) GetTimestampUnixNano() int64 {
@@ -6490,7 +6676,7 @@ type LogChunk struct {
 
 func (x *LogChunk) Reset() {
 	*x = LogChunk{}
-	mi := &file_agent_v1_agent_proto_msgTypes[68]
+	mi := &file_agent_v1_agent_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6502,7 +6688,7 @@ func (x *LogChunk) String() string {
 func (*LogChunk) ProtoMessage() {}
 
 func (x *LogChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[68]
+	mi := &file_agent_v1_agent_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6515,7 +6701,7 @@ func (x *LogChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogChunk.ProtoReflect.Descriptor instead.
 func (*LogChunk) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{68}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *LogChunk) GetRequestId() string {
@@ -6572,7 +6758,7 @@ type ListEventsCommand struct {
 
 func (x *ListEventsCommand) Reset() {
 	*x = ListEventsCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[69]
+	mi := &file_agent_v1_agent_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6584,7 +6770,7 @@ func (x *ListEventsCommand) String() string {
 func (*ListEventsCommand) ProtoMessage() {}
 
 func (x *ListEventsCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[69]
+	mi := &file_agent_v1_agent_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6597,7 +6783,7 @@ func (x *ListEventsCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEventsCommand.ProtoReflect.Descriptor instead.
 func (*ListEventsCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{69}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *ListEventsCommand) GetRequestId() string {
@@ -6648,7 +6834,7 @@ type ContainerEvent struct {
 
 func (x *ContainerEvent) Reset() {
 	*x = ContainerEvent{}
-	mi := &file_agent_v1_agent_proto_msgTypes[70]
+	mi := &file_agent_v1_agent_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6660,7 +6846,7 @@ func (x *ContainerEvent) String() string {
 func (*ContainerEvent) ProtoMessage() {}
 
 func (x *ContainerEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[70]
+	mi := &file_agent_v1_agent_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6673,7 +6859,7 @@ func (x *ContainerEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContainerEvent.ProtoReflect.Descriptor instead.
 func (*ContainerEvent) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{70}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *ContainerEvent) GetTimestampUnix() int64 {
@@ -6722,7 +6908,7 @@ type EventListResult struct {
 
 func (x *EventListResult) Reset() {
 	*x = EventListResult{}
-	mi := &file_agent_v1_agent_proto_msgTypes[71]
+	mi := &file_agent_v1_agent_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6734,7 +6920,7 @@ func (x *EventListResult) String() string {
 func (*EventListResult) ProtoMessage() {}
 
 func (x *EventListResult) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[71]
+	mi := &file_agent_v1_agent_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6747,7 +6933,7 @@ func (x *EventListResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EventListResult.ProtoReflect.Descriptor instead.
 func (*EventListResult) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{71}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *EventListResult) GetRequestId() string {
@@ -6794,7 +6980,7 @@ type ExecStartCommand struct {
 
 func (x *ExecStartCommand) Reset() {
 	*x = ExecStartCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[72]
+	mi := &file_agent_v1_agent_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6806,7 +6992,7 @@ func (x *ExecStartCommand) String() string {
 func (*ExecStartCommand) ProtoMessage() {}
 
 func (x *ExecStartCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[72]
+	mi := &file_agent_v1_agent_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6819,7 +7005,7 @@ func (x *ExecStartCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecStartCommand.ProtoReflect.Descriptor instead.
 func (*ExecStartCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{72}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *ExecStartCommand) GetRequestId() string {
@@ -6887,7 +7073,7 @@ type ExecInputCommand struct {
 
 func (x *ExecInputCommand) Reset() {
 	*x = ExecInputCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[73]
+	mi := &file_agent_v1_agent_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6899,7 +7085,7 @@ func (x *ExecInputCommand) String() string {
 func (*ExecInputCommand) ProtoMessage() {}
 
 func (x *ExecInputCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[73]
+	mi := &file_agent_v1_agent_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6912,7 +7098,7 @@ func (x *ExecInputCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecInputCommand.ProtoReflect.Descriptor instead.
 func (*ExecInputCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{73}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *ExecInputCommand) GetRequestId() string {
@@ -6956,7 +7142,7 @@ type ExecOutputChunk struct {
 
 func (x *ExecOutputChunk) Reset() {
 	*x = ExecOutputChunk{}
-	mi := &file_agent_v1_agent_proto_msgTypes[74]
+	mi := &file_agent_v1_agent_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6968,7 +7154,7 @@ func (x *ExecOutputChunk) String() string {
 func (*ExecOutputChunk) ProtoMessage() {}
 
 func (x *ExecOutputChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[74]
+	mi := &file_agent_v1_agent_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6981,7 +7167,7 @@ func (x *ExecOutputChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecOutputChunk.ProtoReflect.Descriptor instead.
 func (*ExecOutputChunk) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{74}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *ExecOutputChunk) GetRequestId() string {
@@ -7063,7 +7249,7 @@ type BuildImageCommand struct {
 
 func (x *BuildImageCommand) Reset() {
 	*x = BuildImageCommand{}
-	mi := &file_agent_v1_agent_proto_msgTypes[75]
+	mi := &file_agent_v1_agent_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7075,7 +7261,7 @@ func (x *BuildImageCommand) String() string {
 func (*BuildImageCommand) ProtoMessage() {}
 
 func (x *BuildImageCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[75]
+	mi := &file_agent_v1_agent_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7088,7 +7274,7 @@ func (x *BuildImageCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildImageCommand.ProtoReflect.Descriptor instead.
 func (*BuildImageCommand) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{75}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *BuildImageCommand) GetBuildId() string {
@@ -7223,7 +7409,7 @@ type BuildStatus struct {
 
 func (x *BuildStatus) Reset() {
 	*x = BuildStatus{}
-	mi := &file_agent_v1_agent_proto_msgTypes[76]
+	mi := &file_agent_v1_agent_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7235,7 +7421,7 @@ func (x *BuildStatus) String() string {
 func (*BuildStatus) ProtoMessage() {}
 
 func (x *BuildStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_agent_v1_agent_proto_msgTypes[76]
+	mi := &file_agent_v1_agent_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7248,7 +7434,7 @@ func (x *BuildStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildStatus.ProtoReflect.Descriptor instead.
 func (*BuildStatus) Descriptor() ([]byte, []int) {
-	return file_agent_v1_agent_proto_rawDescGZIP(), []int{76}
+	return file_agent_v1_agent_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *BuildStatus) GetBuildId() string {
@@ -7337,7 +7523,7 @@ const file_agent_v1_agent_proto_rawDesc = "" +
 	"\rvolume_detail\x18\x11 \x01(\v2\x16.agent.v1.VolumeDetailH\x00R\fvolumeDetail\x12:\n" +
 	"\fbuild_status\x18\x12 \x01(\v2\x15.agent.v1.BuildStatusH\x00R\vbuildStatus\x12J\n" +
 	"\x12volume_file_result\x18\x13 \x01(\v2\x1a.agent.v1.VolumeFileResultH\x00R\x10volumeFileResultB\t\n" +
-	"\apayload\"\xa4\x14\n" +
+	"\apayload\"\xba\x15\n" +
 	"\x0eControlMessage\x12A\n" +
 	"\fdeploy_stack\x18\x01 \x01(\v2\x1c.agent.v1.DeployStackCommandH\x00R\vdeployStack\x12!\n" +
 	"\x03ack\x18\x02 \x01(\v2\r.agent.v1.AckH\x00R\x03ack\x121\n" +
@@ -7385,7 +7571,9 @@ const file_agent_v1_agent_proto_rawDesc = "" +
 	"\n" +
 	"push_image\x18# \x01(\v2\x1a.agent.v1.PushImageCommandH\x00R\tpushImage\x12>\n" +
 	"\vvolume_file\x18$ \x01(\v2\x1b.agent.v1.VolumeFileCommandH\x00R\n" +
-	"volumeFileB\t\n" +
+	"volumeFile\x12D\n" +
+	"\rprune_volumes\x18% \x01(\v2\x1d.agent.v1.PruneVolumesCommandH\x00R\fpruneVolumes\x12N\n" +
+	"\x11prune_build_cache\x18& \x01(\v2 .agent.v1.PruneBuildCacheCommandH\x00R\x0fpruneBuildCacheB\t\n" +
 	"\apayload\"\x89\x03\n" +
 	"\tHeartbeat\x12\x1b\n" +
 	"\tserver_id\x18\x01 \x01(\tR\bserverId\x123\n" +
@@ -7610,7 +7798,7 @@ const file_agent_v1_agent_proto_rawDesc = "" +
 	"pids_limit\x18\r \x01(\x03R\tpidsLimit\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe9\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x90\x02\n" +
 	"\x16ContainerActionCommand\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
@@ -7618,7 +7806,8 @@ const file_agent_v1_agent_proto_rawDesc = "" +
 	"\fcontainer_id\x18\x03 \x01(\tR\vcontainerId\x121\n" +
 	"\x06action\x18\x04 \x01(\x0e2\x19.agent.v1.ContainerActionR\x06action\x12'\n" +
 	"\x0ftimeout_seconds\x18\x05 \x01(\x05R\x0etimeoutSeconds\x12\x14\n" +
-	"\x05force\x18\x06 \x01(\bR\x05force\"\x87\x01\n" +
+	"\x05force\x18\x06 \x01(\bR\x05force\x12%\n" +
+	"\x0eremove_volumes\x18\a \x01(\bR\rremoveVolumes\"\x87\x01\n" +
 	"\x16CreateContainerCommand\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
@@ -7740,6 +7929,11 @@ const file_agent_v1_agent_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
 	"\tserver_id\x18\x02 \x01(\tR\bserverId\x12\x10\n" +
+	"\x03all\x18\x03 \x01(\bR\x03all\"f\n" +
+	"\x16PruneBuildCacheCommand\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
+	"\tserver_id\x18\x02 \x01(\tR\bserverId\x12\x10\n" +
 	"\x03all\x18\x03 \x01(\bR\x03all\"\xb1\x01\n" +
 	"\rImageOpResult\x12\x1d\n" +
 	"\n" +
@@ -7843,7 +8037,12 @@ const file_agent_v1_agent_proto_rawDesc = "" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
 	"\tserver_id\x18\x02 \x01(\tR\bserverId\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x14\n" +
-	"\x05force\x18\x04 \x01(\bR\x05force\"f\n" +
+	"\x05force\x18\x04 \x01(\bR\x05force\"c\n" +
+	"\x13PruneVolumesCommand\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
+	"\tserver_id\x18\x02 \x01(\tR\bserverId\x12\x10\n" +
+	"\x03all\x18\x03 \x01(\bR\x03all\"f\n" +
 	"\x14InspectVolumeCommand\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
@@ -7854,13 +8053,15 @@ const file_agent_v1_agent_proto_rawDesc = "" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x14\n" +
 	"\x05found\x18\x02 \x01(\bR\x05found\x12#\n" +
 	"\rerror_message\x18\x03 \x01(\tR\ferrorMessage\x12/\n" +
-	"\x06volume\x18\x04 \x01(\v2\x17.agent.v1.VolumeSummaryR\x06volume\"\x82\x01\n" +
+	"\x06volume\x18\x04 \x01(\v2\x17.agent.v1.VolumeSummaryR\x06volume\"\xd0\x01\n" +
 	"\x0eVolumeOpResult\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x18\n" +
 	"\asuccess\x18\x02 \x01(\bR\asuccess\x12#\n" +
 	"\rerror_message\x18\x03 \x01(\tR\ferrorMessage\x12\x12\n" +
-	"\x04name\x18\x04 \x01(\tR\x04name\"\xe1\x01\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\x12'\n" +
+	"\x0freclaimed_bytes\x18\x05 \x01(\x03R\x0ereclaimedBytes\x12#\n" +
+	"\rremoved_count\x18\x06 \x01(\x05R\fremovedCount\"\xe1\x01\n" +
 	"\x11VolumeFileCommand\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1b\n" +
@@ -8043,7 +8244,7 @@ func file_agent_v1_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_agent_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 90)
+var file_agent_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 92)
 var file_agent_v1_agent_proto_goTypes = []any{
 	(DeployPhase)(0),                              // 0: agent.v1.DeployPhase
 	(TaskPhase)(0),                                // 1: agent.v1.TaskPhase
@@ -8094,159 +8295,163 @@ var file_agent_v1_agent_proto_goTypes = []any{
 	(*PushImageCommand)(nil),                      // 46: agent.v1.PushImageCommand
 	(*RemoveImageCommand)(nil),                    // 47: agent.v1.RemoveImageCommand
 	(*PruneImagesCommand)(nil),                    // 48: agent.v1.PruneImagesCommand
-	(*ImageOpResult)(nil),                         // 49: agent.v1.ImageOpResult
-	(*NetworkSummary)(nil),                        // 50: agent.v1.NetworkSummary
-	(*ListNetworksCommand)(nil),                   // 51: agent.v1.ListNetworksCommand
-	(*NetworkListResult)(nil),                     // 52: agent.v1.NetworkListResult
-	(*CreateNetworkCommand)(nil),                  // 53: agent.v1.CreateNetworkCommand
-	(*RemoveNetworkCommand)(nil),                  // 54: agent.v1.RemoveNetworkCommand
-	(*ConnectContainerToNetworkCommand)(nil),      // 55: agent.v1.ConnectContainerToNetworkCommand
-	(*DisconnectContainerFromNetworkCommand)(nil), // 56: agent.v1.DisconnectContainerFromNetworkCommand
-	(*NetworkOpResult)(nil),                       // 57: agent.v1.NetworkOpResult
-	(*VolumeSummary)(nil),                         // 58: agent.v1.VolumeSummary
-	(*ListVolumesCommand)(nil),                    // 59: agent.v1.ListVolumesCommand
-	(*VolumeListResult)(nil),                      // 60: agent.v1.VolumeListResult
-	(*CreateVolumeCommand)(nil),                   // 61: agent.v1.CreateVolumeCommand
-	(*RemoveVolumeCommand)(nil),                   // 62: agent.v1.RemoveVolumeCommand
-	(*InspectVolumeCommand)(nil),                  // 63: agent.v1.InspectVolumeCommand
-	(*VolumeDetail)(nil),                          // 64: agent.v1.VolumeDetail
-	(*VolumeOpResult)(nil),                        // 65: agent.v1.VolumeOpResult
-	(*VolumeFileCommand)(nil),                     // 66: agent.v1.VolumeFileCommand
-	(*VolumeFileEntry)(nil),                       // 67: agent.v1.VolumeFileEntry
-	(*VolumeFileResult)(nil),                      // 68: agent.v1.VolumeFileResult
-	(*StreamLogsCommand)(nil),                     // 69: agent.v1.StreamLogsCommand
-	(*StopStreamCommand)(nil),                     // 70: agent.v1.StopStreamCommand
-	(*LogLine)(nil),                               // 71: agent.v1.LogLine
-	(*LogChunk)(nil),                              // 72: agent.v1.LogChunk
-	(*ListEventsCommand)(nil),                     // 73: agent.v1.ListEventsCommand
-	(*ContainerEvent)(nil),                        // 74: agent.v1.ContainerEvent
-	(*EventListResult)(nil),                       // 75: agent.v1.EventListResult
-	(*ExecStartCommand)(nil),                      // 76: agent.v1.ExecStartCommand
-	(*ExecInputCommand)(nil),                      // 77: agent.v1.ExecInputCommand
-	(*ExecOutputChunk)(nil),                       // 78: agent.v1.ExecOutputChunk
-	(*BuildImageCommand)(nil),                     // 79: agent.v1.BuildImageCommand
-	(*BuildStatus)(nil),                           // 80: agent.v1.BuildStatus
-	nil,                                           // 81: agent.v1.DeployStackCommand.EnvEntry
-	nil,                                           // 82: agent.v1.DeployStackCommand.ReplicasEntry
-	nil,                                           // 83: agent.v1.DeployServiceCommand.EnvEntry
-	nil,                                           // 84: agent.v1.RestoreCommand.EnvEntry
-	nil,                                           // 85: agent.v1.ContainerDetail.LabelsEntry
-	nil,                                           // 86: agent.v1.ContainerConfig.LabelsEntry
-	nil,                                           // 87: agent.v1.ImageDetail.LabelsEntry
-	nil,                                           // 88: agent.v1.NetworkSummary.LabelsEntry
-	nil,                                           // 89: agent.v1.CreateNetworkCommand.LabelsEntry
-	nil,                                           // 90: agent.v1.VolumeSummary.LabelsEntry
-	nil,                                           // 91: agent.v1.CreateVolumeCommand.LabelsEntry
-	nil,                                           // 92: agent.v1.BuildImageCommand.BuildArgsEntry
-	nil,                                           // 93: agent.v1.BuildImageCommand.LabelsEntry
-	(*timestamppb.Timestamp)(nil),                 // 94: google.protobuf.Timestamp
+	(*PruneBuildCacheCommand)(nil),                // 49: agent.v1.PruneBuildCacheCommand
+	(*ImageOpResult)(nil),                         // 50: agent.v1.ImageOpResult
+	(*NetworkSummary)(nil),                        // 51: agent.v1.NetworkSummary
+	(*ListNetworksCommand)(nil),                   // 52: agent.v1.ListNetworksCommand
+	(*NetworkListResult)(nil),                     // 53: agent.v1.NetworkListResult
+	(*CreateNetworkCommand)(nil),                  // 54: agent.v1.CreateNetworkCommand
+	(*RemoveNetworkCommand)(nil),                  // 55: agent.v1.RemoveNetworkCommand
+	(*ConnectContainerToNetworkCommand)(nil),      // 56: agent.v1.ConnectContainerToNetworkCommand
+	(*DisconnectContainerFromNetworkCommand)(nil), // 57: agent.v1.DisconnectContainerFromNetworkCommand
+	(*NetworkOpResult)(nil),                       // 58: agent.v1.NetworkOpResult
+	(*VolumeSummary)(nil),                         // 59: agent.v1.VolumeSummary
+	(*ListVolumesCommand)(nil),                    // 60: agent.v1.ListVolumesCommand
+	(*VolumeListResult)(nil),                      // 61: agent.v1.VolumeListResult
+	(*CreateVolumeCommand)(nil),                   // 62: agent.v1.CreateVolumeCommand
+	(*RemoveVolumeCommand)(nil),                   // 63: agent.v1.RemoveVolumeCommand
+	(*PruneVolumesCommand)(nil),                   // 64: agent.v1.PruneVolumesCommand
+	(*InspectVolumeCommand)(nil),                  // 65: agent.v1.InspectVolumeCommand
+	(*VolumeDetail)(nil),                          // 66: agent.v1.VolumeDetail
+	(*VolumeOpResult)(nil),                        // 67: agent.v1.VolumeOpResult
+	(*VolumeFileCommand)(nil),                     // 68: agent.v1.VolumeFileCommand
+	(*VolumeFileEntry)(nil),                       // 69: agent.v1.VolumeFileEntry
+	(*VolumeFileResult)(nil),                      // 70: agent.v1.VolumeFileResult
+	(*StreamLogsCommand)(nil),                     // 71: agent.v1.StreamLogsCommand
+	(*StopStreamCommand)(nil),                     // 72: agent.v1.StopStreamCommand
+	(*LogLine)(nil),                               // 73: agent.v1.LogLine
+	(*LogChunk)(nil),                              // 74: agent.v1.LogChunk
+	(*ListEventsCommand)(nil),                     // 75: agent.v1.ListEventsCommand
+	(*ContainerEvent)(nil),                        // 76: agent.v1.ContainerEvent
+	(*EventListResult)(nil),                       // 77: agent.v1.EventListResult
+	(*ExecStartCommand)(nil),                      // 78: agent.v1.ExecStartCommand
+	(*ExecInputCommand)(nil),                      // 79: agent.v1.ExecInputCommand
+	(*ExecOutputChunk)(nil),                       // 80: agent.v1.ExecOutputChunk
+	(*BuildImageCommand)(nil),                     // 81: agent.v1.BuildImageCommand
+	(*BuildStatus)(nil),                           // 82: agent.v1.BuildStatus
+	nil,                                           // 83: agent.v1.DeployStackCommand.EnvEntry
+	nil,                                           // 84: agent.v1.DeployStackCommand.ReplicasEntry
+	nil,                                           // 85: agent.v1.DeployServiceCommand.EnvEntry
+	nil,                                           // 86: agent.v1.RestoreCommand.EnvEntry
+	nil,                                           // 87: agent.v1.ContainerDetail.LabelsEntry
+	nil,                                           // 88: agent.v1.ContainerConfig.LabelsEntry
+	nil,                                           // 89: agent.v1.ImageDetail.LabelsEntry
+	nil,                                           // 90: agent.v1.NetworkSummary.LabelsEntry
+	nil,                                           // 91: agent.v1.CreateNetworkCommand.LabelsEntry
+	nil,                                           // 92: agent.v1.VolumeSummary.LabelsEntry
+	nil,                                           // 93: agent.v1.CreateVolumeCommand.LabelsEntry
+	nil,                                           // 94: agent.v1.BuildImageCommand.BuildArgsEntry
+	nil,                                           // 95: agent.v1.BuildImageCommand.LabelsEntry
+	(*timestamppb.Timestamp)(nil),                 // 96: google.protobuf.Timestamp
 }
 var file_agent_v1_agent_proto_depIdxs = []int32{
-	8,  // 0: agent.v1.AgentMessage.heartbeat:type_name -> agent.v1.Heartbeat
-	18, // 1: agent.v1.AgentMessage.deploy_status:type_name -> agent.v1.DeployStatus
-	21, // 2: agent.v1.AgentMessage.backup_status:type_name -> agent.v1.BackupStatus
-	23, // 3: agent.v1.AgentMessage.restore_status:type_name -> agent.v1.RestoreStatus
-	25, // 4: agent.v1.AgentMessage.container_detail:type_name -> agent.v1.ContainerDetail
-	37, // 5: agent.v1.AgentMessage.container_op_result:type_name -> agent.v1.ContainerOpResult
-	40, // 6: agent.v1.AgentMessage.image_list_result:type_name -> agent.v1.ImageListResult
-	43, // 7: agent.v1.AgentMessage.image_detail:type_name -> agent.v1.ImageDetail
-	49, // 8: agent.v1.AgentMessage.image_op_result:type_name -> agent.v1.ImageOpResult
-	72, // 9: agent.v1.AgentMessage.log_chunk:type_name -> agent.v1.LogChunk
-	75, // 10: agent.v1.AgentMessage.event_list_result:type_name -> agent.v1.EventListResult
-	78, // 11: agent.v1.AgentMessage.exec_output:type_name -> agent.v1.ExecOutputChunk
-	52, // 12: agent.v1.AgentMessage.network_list_result:type_name -> agent.v1.NetworkListResult
-	57, // 13: agent.v1.AgentMessage.network_op_result:type_name -> agent.v1.NetworkOpResult
-	60, // 14: agent.v1.AgentMessage.volume_list_result:type_name -> agent.v1.VolumeListResult
-	65, // 15: agent.v1.AgentMessage.volume_op_result:type_name -> agent.v1.VolumeOpResult
-	64, // 16: agent.v1.AgentMessage.volume_detail:type_name -> agent.v1.VolumeDetail
-	80, // 17: agent.v1.AgentMessage.build_status:type_name -> agent.v1.BuildStatus
-	68, // 18: agent.v1.AgentMessage.volume_file_result:type_name -> agent.v1.VolumeFileResult
-	15, // 19: agent.v1.ControlMessage.deploy_stack:type_name -> agent.v1.DeployStackCommand
-	19, // 20: agent.v1.ControlMessage.ack:type_name -> agent.v1.Ack
-	20, // 21: agent.v1.ControlMessage.backup:type_name -> agent.v1.BackupCommand
-	22, // 22: agent.v1.ControlMessage.restore:type_name -> agent.v1.RestoreCommand
-	24, // 23: agent.v1.ControlMessage.inspect_container:type_name -> agent.v1.InspectContainerCommand
-	30, // 24: agent.v1.ControlMessage.container_action:type_name -> agent.v1.ContainerActionCommand
-	31, // 25: agent.v1.ControlMessage.create_container:type_name -> agent.v1.CreateContainerCommand
-	32, // 26: agent.v1.ControlMessage.rename_container:type_name -> agent.v1.RenameContainerCommand
-	33, // 27: agent.v1.ControlMessage.clone_container:type_name -> agent.v1.CloneContainerCommand
-	34, // 28: agent.v1.ControlMessage.recreate_container:type_name -> agent.v1.RecreateContainerCommand
-	35, // 29: agent.v1.ControlMessage.update_restart_policy:type_name -> agent.v1.UpdateRestartPolicyCommand
-	39, // 30: agent.v1.ControlMessage.list_images:type_name -> agent.v1.ListImagesCommand
-	41, // 31: agent.v1.ControlMessage.inspect_image:type_name -> agent.v1.InspectImageCommand
-	45, // 32: agent.v1.ControlMessage.pull_image:type_name -> agent.v1.PullImageCommand
-	47, // 33: agent.v1.ControlMessage.remove_image:type_name -> agent.v1.RemoveImageCommand
-	48, // 34: agent.v1.ControlMessage.prune_images:type_name -> agent.v1.PruneImagesCommand
-	69, // 35: agent.v1.ControlMessage.stream_logs:type_name -> agent.v1.StreamLogsCommand
-	70, // 36: agent.v1.ControlMessage.stop_stream:type_name -> agent.v1.StopStreamCommand
-	73, // 37: agent.v1.ControlMessage.list_events:type_name -> agent.v1.ListEventsCommand
-	76, // 38: agent.v1.ControlMessage.exec_start:type_name -> agent.v1.ExecStartCommand
-	77, // 39: agent.v1.ControlMessage.exec_input:type_name -> agent.v1.ExecInputCommand
-	36, // 40: agent.v1.ControlMessage.update_resource_limits:type_name -> agent.v1.UpdateResourceLimitsCommand
-	51, // 41: agent.v1.ControlMessage.list_networks:type_name -> agent.v1.ListNetworksCommand
-	53, // 42: agent.v1.ControlMessage.create_network:type_name -> agent.v1.CreateNetworkCommand
-	54, // 43: agent.v1.ControlMessage.remove_network:type_name -> agent.v1.RemoveNetworkCommand
-	55, // 44: agent.v1.ControlMessage.connect_container_to_network:type_name -> agent.v1.ConnectContainerToNetworkCommand
-	56, // 45: agent.v1.ControlMessage.disconnect_container_from_network:type_name -> agent.v1.DisconnectContainerFromNetworkCommand
-	59, // 46: agent.v1.ControlMessage.list_volumes:type_name -> agent.v1.ListVolumesCommand
-	61, // 47: agent.v1.ControlMessage.create_volume:type_name -> agent.v1.CreateVolumeCommand
-	62, // 48: agent.v1.ControlMessage.remove_volume:type_name -> agent.v1.RemoveVolumeCommand
-	63, // 49: agent.v1.ControlMessage.inspect_volume:type_name -> agent.v1.InspectVolumeCommand
-	16, // 50: agent.v1.ControlMessage.undeploy:type_name -> agent.v1.UndeployCommand
-	17, // 51: agent.v1.ControlMessage.deploy_service:type_name -> agent.v1.DeployServiceCommand
-	79, // 52: agent.v1.ControlMessage.build_image:type_name -> agent.v1.BuildImageCommand
-	46, // 53: agent.v1.ControlMessage.push_image:type_name -> agent.v1.PushImageCommand
-	66, // 54: agent.v1.ControlMessage.volume_file:type_name -> agent.v1.VolumeFileCommand
-	94, // 55: agent.v1.Heartbeat.sent_at:type_name -> google.protobuf.Timestamp
-	10, // 56: agent.v1.Heartbeat.resources:type_name -> agent.v1.ResourceSnapshot
-	11, // 57: agent.v1.Heartbeat.containers:type_name -> agent.v1.ContainerSummary
-	9,  // 58: agent.v1.Heartbeat.container_stats:type_name -> agent.v1.ContainerResourceUsage
-	12, // 59: agent.v1.ContainerSummary.ports:type_name -> agent.v1.ContainerPort
-	13, // 60: agent.v1.ContainerSummary.networks:type_name -> agent.v1.ContainerNetwork
-	14, // 61: agent.v1.ContainerSummary.mounts:type_name -> agent.v1.ContainerMount
-	81, // 62: agent.v1.DeployStackCommand.env:type_name -> agent.v1.DeployStackCommand.EnvEntry
-	82, // 63: agent.v1.DeployStackCommand.replicas:type_name -> agent.v1.DeployStackCommand.ReplicasEntry
-	83, // 64: agent.v1.DeployServiceCommand.env:type_name -> agent.v1.DeployServiceCommand.EnvEntry
-	0,  // 65: agent.v1.DeployStatus.phase:type_name -> agent.v1.DeployPhase
-	94, // 66: agent.v1.DeployStatus.updated_at:type_name -> google.protobuf.Timestamp
-	1,  // 67: agent.v1.BackupStatus.phase:type_name -> agent.v1.TaskPhase
-	84, // 68: agent.v1.RestoreCommand.env:type_name -> agent.v1.RestoreCommand.EnvEntry
-	1,  // 69: agent.v1.RestoreStatus.phase:type_name -> agent.v1.TaskPhase
-	26, // 70: agent.v1.ContainerDetail.health_log:type_name -> agent.v1.HealthCheckEntry
-	85, // 71: agent.v1.ContainerDetail.labels:type_name -> agent.v1.ContainerDetail.LabelsEntry
-	27, // 72: agent.v1.ContainerConfig.ports:type_name -> agent.v1.ContainerPortSpec
-	28, // 73: agent.v1.ContainerConfig.volumes:type_name -> agent.v1.ContainerVolumeSpec
-	86, // 74: agent.v1.ContainerConfig.labels:type_name -> agent.v1.ContainerConfig.LabelsEntry
-	2,  // 75: agent.v1.ContainerActionCommand.action:type_name -> agent.v1.ContainerAction
-	29, // 76: agent.v1.CreateContainerCommand.config:type_name -> agent.v1.ContainerConfig
-	29, // 77: agent.v1.RecreateContainerCommand.config:type_name -> agent.v1.ContainerConfig
-	38, // 78: agent.v1.ImageListResult.images:type_name -> agent.v1.ImageSummary
-	42, // 79: agent.v1.ImageDetail.layers:type_name -> agent.v1.ImageLayer
-	87, // 80: agent.v1.ImageDetail.labels:type_name -> agent.v1.ImageDetail.LabelsEntry
-	44, // 81: agent.v1.PullImageCommand.auth:type_name -> agent.v1.RegistryAuth
-	44, // 82: agent.v1.PushImageCommand.auth:type_name -> agent.v1.RegistryAuth
-	88, // 83: agent.v1.NetworkSummary.labels:type_name -> agent.v1.NetworkSummary.LabelsEntry
-	50, // 84: agent.v1.NetworkListResult.networks:type_name -> agent.v1.NetworkSummary
-	89, // 85: agent.v1.CreateNetworkCommand.labels:type_name -> agent.v1.CreateNetworkCommand.LabelsEntry
-	90, // 86: agent.v1.VolumeSummary.labels:type_name -> agent.v1.VolumeSummary.LabelsEntry
-	58, // 87: agent.v1.VolumeListResult.volumes:type_name -> agent.v1.VolumeSummary
-	91, // 88: agent.v1.CreateVolumeCommand.labels:type_name -> agent.v1.CreateVolumeCommand.LabelsEntry
-	58, // 89: agent.v1.VolumeDetail.volume:type_name -> agent.v1.VolumeSummary
-	67, // 90: agent.v1.VolumeFileResult.entries:type_name -> agent.v1.VolumeFileEntry
-	71, // 91: agent.v1.LogChunk.lines:type_name -> agent.v1.LogLine
-	74, // 92: agent.v1.EventListResult.events:type_name -> agent.v1.ContainerEvent
-	92, // 93: agent.v1.BuildImageCommand.build_args:type_name -> agent.v1.BuildImageCommand.BuildArgsEntry
-	93, // 94: agent.v1.BuildImageCommand.labels:type_name -> agent.v1.BuildImageCommand.LabelsEntry
-	3,  // 95: agent.v1.BuildStatus.phase:type_name -> agent.v1.BuildPhase
-	4,  // 96: agent.v1.AgentSession.Enroll:input_type -> agent.v1.EnrollRequest
-	6,  // 97: agent.v1.AgentSession.Session:input_type -> agent.v1.AgentMessage
-	5,  // 98: agent.v1.AgentSession.Enroll:output_type -> agent.v1.EnrollResponse
-	7,  // 99: agent.v1.AgentSession.Session:output_type -> agent.v1.ControlMessage
-	98, // [98:100] is the sub-list for method output_type
-	96, // [96:98] is the sub-list for method input_type
-	96, // [96:96] is the sub-list for extension type_name
-	96, // [96:96] is the sub-list for extension extendee
-	0,  // [0:96] is the sub-list for field type_name
+	8,   // 0: agent.v1.AgentMessage.heartbeat:type_name -> agent.v1.Heartbeat
+	18,  // 1: agent.v1.AgentMessage.deploy_status:type_name -> agent.v1.DeployStatus
+	21,  // 2: agent.v1.AgentMessage.backup_status:type_name -> agent.v1.BackupStatus
+	23,  // 3: agent.v1.AgentMessage.restore_status:type_name -> agent.v1.RestoreStatus
+	25,  // 4: agent.v1.AgentMessage.container_detail:type_name -> agent.v1.ContainerDetail
+	37,  // 5: agent.v1.AgentMessage.container_op_result:type_name -> agent.v1.ContainerOpResult
+	40,  // 6: agent.v1.AgentMessage.image_list_result:type_name -> agent.v1.ImageListResult
+	43,  // 7: agent.v1.AgentMessage.image_detail:type_name -> agent.v1.ImageDetail
+	50,  // 8: agent.v1.AgentMessage.image_op_result:type_name -> agent.v1.ImageOpResult
+	74,  // 9: agent.v1.AgentMessage.log_chunk:type_name -> agent.v1.LogChunk
+	77,  // 10: agent.v1.AgentMessage.event_list_result:type_name -> agent.v1.EventListResult
+	80,  // 11: agent.v1.AgentMessage.exec_output:type_name -> agent.v1.ExecOutputChunk
+	53,  // 12: agent.v1.AgentMessage.network_list_result:type_name -> agent.v1.NetworkListResult
+	58,  // 13: agent.v1.AgentMessage.network_op_result:type_name -> agent.v1.NetworkOpResult
+	61,  // 14: agent.v1.AgentMessage.volume_list_result:type_name -> agent.v1.VolumeListResult
+	67,  // 15: agent.v1.AgentMessage.volume_op_result:type_name -> agent.v1.VolumeOpResult
+	66,  // 16: agent.v1.AgentMessage.volume_detail:type_name -> agent.v1.VolumeDetail
+	82,  // 17: agent.v1.AgentMessage.build_status:type_name -> agent.v1.BuildStatus
+	70,  // 18: agent.v1.AgentMessage.volume_file_result:type_name -> agent.v1.VolumeFileResult
+	15,  // 19: agent.v1.ControlMessage.deploy_stack:type_name -> agent.v1.DeployStackCommand
+	19,  // 20: agent.v1.ControlMessage.ack:type_name -> agent.v1.Ack
+	20,  // 21: agent.v1.ControlMessage.backup:type_name -> agent.v1.BackupCommand
+	22,  // 22: agent.v1.ControlMessage.restore:type_name -> agent.v1.RestoreCommand
+	24,  // 23: agent.v1.ControlMessage.inspect_container:type_name -> agent.v1.InspectContainerCommand
+	30,  // 24: agent.v1.ControlMessage.container_action:type_name -> agent.v1.ContainerActionCommand
+	31,  // 25: agent.v1.ControlMessage.create_container:type_name -> agent.v1.CreateContainerCommand
+	32,  // 26: agent.v1.ControlMessage.rename_container:type_name -> agent.v1.RenameContainerCommand
+	33,  // 27: agent.v1.ControlMessage.clone_container:type_name -> agent.v1.CloneContainerCommand
+	34,  // 28: agent.v1.ControlMessage.recreate_container:type_name -> agent.v1.RecreateContainerCommand
+	35,  // 29: agent.v1.ControlMessage.update_restart_policy:type_name -> agent.v1.UpdateRestartPolicyCommand
+	39,  // 30: agent.v1.ControlMessage.list_images:type_name -> agent.v1.ListImagesCommand
+	41,  // 31: agent.v1.ControlMessage.inspect_image:type_name -> agent.v1.InspectImageCommand
+	45,  // 32: agent.v1.ControlMessage.pull_image:type_name -> agent.v1.PullImageCommand
+	47,  // 33: agent.v1.ControlMessage.remove_image:type_name -> agent.v1.RemoveImageCommand
+	48,  // 34: agent.v1.ControlMessage.prune_images:type_name -> agent.v1.PruneImagesCommand
+	71,  // 35: agent.v1.ControlMessage.stream_logs:type_name -> agent.v1.StreamLogsCommand
+	72,  // 36: agent.v1.ControlMessage.stop_stream:type_name -> agent.v1.StopStreamCommand
+	75,  // 37: agent.v1.ControlMessage.list_events:type_name -> agent.v1.ListEventsCommand
+	78,  // 38: agent.v1.ControlMessage.exec_start:type_name -> agent.v1.ExecStartCommand
+	79,  // 39: agent.v1.ControlMessage.exec_input:type_name -> agent.v1.ExecInputCommand
+	36,  // 40: agent.v1.ControlMessage.update_resource_limits:type_name -> agent.v1.UpdateResourceLimitsCommand
+	52,  // 41: agent.v1.ControlMessage.list_networks:type_name -> agent.v1.ListNetworksCommand
+	54,  // 42: agent.v1.ControlMessage.create_network:type_name -> agent.v1.CreateNetworkCommand
+	55,  // 43: agent.v1.ControlMessage.remove_network:type_name -> agent.v1.RemoveNetworkCommand
+	56,  // 44: agent.v1.ControlMessage.connect_container_to_network:type_name -> agent.v1.ConnectContainerToNetworkCommand
+	57,  // 45: agent.v1.ControlMessage.disconnect_container_from_network:type_name -> agent.v1.DisconnectContainerFromNetworkCommand
+	60,  // 46: agent.v1.ControlMessage.list_volumes:type_name -> agent.v1.ListVolumesCommand
+	62,  // 47: agent.v1.ControlMessage.create_volume:type_name -> agent.v1.CreateVolumeCommand
+	63,  // 48: agent.v1.ControlMessage.remove_volume:type_name -> agent.v1.RemoveVolumeCommand
+	65,  // 49: agent.v1.ControlMessage.inspect_volume:type_name -> agent.v1.InspectVolumeCommand
+	16,  // 50: agent.v1.ControlMessage.undeploy:type_name -> agent.v1.UndeployCommand
+	17,  // 51: agent.v1.ControlMessage.deploy_service:type_name -> agent.v1.DeployServiceCommand
+	81,  // 52: agent.v1.ControlMessage.build_image:type_name -> agent.v1.BuildImageCommand
+	46,  // 53: agent.v1.ControlMessage.push_image:type_name -> agent.v1.PushImageCommand
+	68,  // 54: agent.v1.ControlMessage.volume_file:type_name -> agent.v1.VolumeFileCommand
+	64,  // 55: agent.v1.ControlMessage.prune_volumes:type_name -> agent.v1.PruneVolumesCommand
+	49,  // 56: agent.v1.ControlMessage.prune_build_cache:type_name -> agent.v1.PruneBuildCacheCommand
+	96,  // 57: agent.v1.Heartbeat.sent_at:type_name -> google.protobuf.Timestamp
+	10,  // 58: agent.v1.Heartbeat.resources:type_name -> agent.v1.ResourceSnapshot
+	11,  // 59: agent.v1.Heartbeat.containers:type_name -> agent.v1.ContainerSummary
+	9,   // 60: agent.v1.Heartbeat.container_stats:type_name -> agent.v1.ContainerResourceUsage
+	12,  // 61: agent.v1.ContainerSummary.ports:type_name -> agent.v1.ContainerPort
+	13,  // 62: agent.v1.ContainerSummary.networks:type_name -> agent.v1.ContainerNetwork
+	14,  // 63: agent.v1.ContainerSummary.mounts:type_name -> agent.v1.ContainerMount
+	83,  // 64: agent.v1.DeployStackCommand.env:type_name -> agent.v1.DeployStackCommand.EnvEntry
+	84,  // 65: agent.v1.DeployStackCommand.replicas:type_name -> agent.v1.DeployStackCommand.ReplicasEntry
+	85,  // 66: agent.v1.DeployServiceCommand.env:type_name -> agent.v1.DeployServiceCommand.EnvEntry
+	0,   // 67: agent.v1.DeployStatus.phase:type_name -> agent.v1.DeployPhase
+	96,  // 68: agent.v1.DeployStatus.updated_at:type_name -> google.protobuf.Timestamp
+	1,   // 69: agent.v1.BackupStatus.phase:type_name -> agent.v1.TaskPhase
+	86,  // 70: agent.v1.RestoreCommand.env:type_name -> agent.v1.RestoreCommand.EnvEntry
+	1,   // 71: agent.v1.RestoreStatus.phase:type_name -> agent.v1.TaskPhase
+	26,  // 72: agent.v1.ContainerDetail.health_log:type_name -> agent.v1.HealthCheckEntry
+	87,  // 73: agent.v1.ContainerDetail.labels:type_name -> agent.v1.ContainerDetail.LabelsEntry
+	27,  // 74: agent.v1.ContainerConfig.ports:type_name -> agent.v1.ContainerPortSpec
+	28,  // 75: agent.v1.ContainerConfig.volumes:type_name -> agent.v1.ContainerVolumeSpec
+	88,  // 76: agent.v1.ContainerConfig.labels:type_name -> agent.v1.ContainerConfig.LabelsEntry
+	2,   // 77: agent.v1.ContainerActionCommand.action:type_name -> agent.v1.ContainerAction
+	29,  // 78: agent.v1.CreateContainerCommand.config:type_name -> agent.v1.ContainerConfig
+	29,  // 79: agent.v1.RecreateContainerCommand.config:type_name -> agent.v1.ContainerConfig
+	38,  // 80: agent.v1.ImageListResult.images:type_name -> agent.v1.ImageSummary
+	42,  // 81: agent.v1.ImageDetail.layers:type_name -> agent.v1.ImageLayer
+	89,  // 82: agent.v1.ImageDetail.labels:type_name -> agent.v1.ImageDetail.LabelsEntry
+	44,  // 83: agent.v1.PullImageCommand.auth:type_name -> agent.v1.RegistryAuth
+	44,  // 84: agent.v1.PushImageCommand.auth:type_name -> agent.v1.RegistryAuth
+	90,  // 85: agent.v1.NetworkSummary.labels:type_name -> agent.v1.NetworkSummary.LabelsEntry
+	51,  // 86: agent.v1.NetworkListResult.networks:type_name -> agent.v1.NetworkSummary
+	91,  // 87: agent.v1.CreateNetworkCommand.labels:type_name -> agent.v1.CreateNetworkCommand.LabelsEntry
+	92,  // 88: agent.v1.VolumeSummary.labels:type_name -> agent.v1.VolumeSummary.LabelsEntry
+	59,  // 89: agent.v1.VolumeListResult.volumes:type_name -> agent.v1.VolumeSummary
+	93,  // 90: agent.v1.CreateVolumeCommand.labels:type_name -> agent.v1.CreateVolumeCommand.LabelsEntry
+	59,  // 91: agent.v1.VolumeDetail.volume:type_name -> agent.v1.VolumeSummary
+	69,  // 92: agent.v1.VolumeFileResult.entries:type_name -> agent.v1.VolumeFileEntry
+	73,  // 93: agent.v1.LogChunk.lines:type_name -> agent.v1.LogLine
+	76,  // 94: agent.v1.EventListResult.events:type_name -> agent.v1.ContainerEvent
+	94,  // 95: agent.v1.BuildImageCommand.build_args:type_name -> agent.v1.BuildImageCommand.BuildArgsEntry
+	95,  // 96: agent.v1.BuildImageCommand.labels:type_name -> agent.v1.BuildImageCommand.LabelsEntry
+	3,   // 97: agent.v1.BuildStatus.phase:type_name -> agent.v1.BuildPhase
+	4,   // 98: agent.v1.AgentSession.Enroll:input_type -> agent.v1.EnrollRequest
+	6,   // 99: agent.v1.AgentSession.Session:input_type -> agent.v1.AgentMessage
+	5,   // 100: agent.v1.AgentSession.Enroll:output_type -> agent.v1.EnrollResponse
+	7,   // 101: agent.v1.AgentSession.Session:output_type -> agent.v1.ControlMessage
+	100, // [100:102] is the sub-list for method output_type
+	98,  // [98:100] is the sub-list for method input_type
+	98,  // [98:98] is the sub-list for extension type_name
+	98,  // [98:98] is the sub-list for extension extendee
+	0,   // [0:98] is the sub-list for field type_name
 }
 
 func init() { file_agent_v1_agent_proto_init() }
@@ -8312,6 +8517,8 @@ func file_agent_v1_agent_proto_init() {
 		(*ControlMessage_BuildImage)(nil),
 		(*ControlMessage_PushImage)(nil),
 		(*ControlMessage_VolumeFile)(nil),
+		(*ControlMessage_PruneVolumes)(nil),
+		(*ControlMessage_PruneBuildCache)(nil),
 	}
 	file_agent_v1_agent_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
@@ -8320,7 +8527,7 @@ func file_agent_v1_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agent_v1_agent_proto_rawDesc), len(file_agent_v1_agent_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   90,
+			NumMessages:   92,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

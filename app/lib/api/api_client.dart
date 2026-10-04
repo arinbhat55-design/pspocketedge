@@ -1830,13 +1830,15 @@ class ApiClient {
   }
 
   /// Applies one lifecycle action (start/stop/restart/pause/resume/kill/
-  /// remove) to a single container.
+  /// remove) to a single container. [removeVolumes] only applies to remove:
+  /// it also deletes the container's anonymous volumes.
   Future<ContainerOpResult> containerAction(
     String serverId,
     String containerId,
     String action, {
     int? timeoutSeconds,
     bool force = false,
+    bool removeVolumes = false,
   }) async {
     final response = await _http.post(
       Uri.parse(
@@ -1847,6 +1849,7 @@ class ApiClient {
         'action': action,
         'timeoutSeconds': ?timeoutSeconds,
         if (force) 'force': force,
+        if (removeVolumes) 'removeVolumes': removeVolumes,
       }),
     );
     return _decodeOpResult(response);
@@ -1860,6 +1863,7 @@ class ApiClient {
     String action, {
     int? timeoutSeconds,
     bool force = false,
+    bool removeVolumes = false,
   }) async {
     final response = await _http.post(
       Uri.parse('$baseUrl/api/containers/bulk-action'),
@@ -1869,6 +1873,7 @@ class ApiClient {
         'action': action,
         'timeoutSeconds': ?timeoutSeconds,
         if (force) 'force': force,
+        if (removeVolumes) 'removeVolumes': removeVolumes,
       }),
     );
     if (response.statusCode != 200) {
@@ -2210,6 +2215,20 @@ class ApiClient {
     return _decodeImageOpResult(response);
   }
 
+  /// Clears dangling (or, with [all], every unused) build cache on
+  /// [serverId], returning the outcome including reclaimed bytes.
+  Future<ImageOpResult> pruneBuildCache(
+    String serverId, {
+    bool all = false,
+  }) async {
+    final response = await _http.post(
+      Uri.parse('$baseUrl/api/servers/$serverId/build-cache/prune'),
+      headers: _headers,
+      body: jsonEncode({'all': all}),
+    );
+    return _decodeImageOpResult(response);
+  }
+
   /// Compares a local image's digest against the registry's current digest
   /// for the same tag, to answer "is a newer image available".
   Future<ImageUpdateStatus> imageUpdateAvailable({
@@ -2468,6 +2487,20 @@ class ApiClient {
       '$baseUrl/api/servers/$serverId/volumes/$name',
     ).replace(queryParameters: {if (force) 'force': 'true'});
     final response = await _http.delete(uri, headers: _headers);
+    return _decodeVolumeOpResult(response);
+  }
+
+  /// Removes unused anonymous volumes (or, with [all], unused named ones
+  /// too) on [serverId]. Deployment volumes are always kept.
+  Future<VolumeOpResult> pruneVolumes(
+    String serverId, {
+    bool all = false,
+  }) async {
+    final response = await _http.post(
+      Uri.parse('$baseUrl/api/servers/$serverId/volumes/prune'),
+      headers: _headers,
+      body: jsonEncode({'all': all}),
+    );
     return _decodeVolumeOpResult(response);
   }
 

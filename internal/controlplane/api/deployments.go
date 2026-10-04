@@ -1289,7 +1289,7 @@ func handleDeploymentAction(d *deployer) http.HandlerFunc {
 			go func(i int, c store.FleetContainer) {
 				defer wg.Done()
 				target := bulkActionTarget{ServerID: c.ServerID, ContainerID: c.ContainerID}
-				results[i] = bulkDispatchOne(d.log, d.dispatcher, d.opWaiter, target, action, 0, false)
+				results[i] = bulkDispatchOne(d.log, d.dispatcher, d.opWaiter, target, action, 0, false, false)
 			}(i, c)
 		}
 		wg.Wait()

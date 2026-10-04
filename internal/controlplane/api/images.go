@@ -30,6 +30,9 @@ const (
 	// imageOpTimeout covers remove/prune, both fast local Docker Engine
 	// calls once dispatched.
 	imageOpTimeout = 60 * time.Second
+	// pruneOpTimeout covers build-cache and volume prunes, which walk every
+	// cache record/volume on disk and can take minutes on a full host.
+	pruneOpTimeout = 5 * time.Minute
 )
 
 // imageSummaryResponse is one image in a list response, with the owning
@@ -373,6 +376,33 @@ func handlePruneImages(log *slog.Logger, dispatcher *deploy.Dispatcher, waiter *
 			},
 		}
 		writeImageOpResult(w, dispatcher, waiter, serverID, requestID, cmd, imageOpTimeout, http.StatusOK)
+	}
+}
+
+// handlePruneBuildCache clears dangling (or, with all:true, every unused)
+// build cache on serverID and reports bytes reclaimed.
+func handlePruneBuildCache(log *slog.Logger, dispatcher *deploy.Dispatcher, waiter *deploy.ImageOpWaiter) http.HandlerFunc {
+	type request struct {
+		All bool `json:"all,omitempty"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		serverID := r.PathValue("id")
+
+		var req request
+		_ = json.NewDecoder(r.Body).Decode(&req)
+
+		requestID, ok := newRequestID(w, log)
+		if !ok {
+			return
+		}
+
+		cmd := &agentv1.ControlMessage{
+			Payload: &agentv1.ControlMessage_PruneBuildCache{
+				PruneBuildCache: &agentv1.PruneBuildCacheCommand{RequestId: requestID, ServerId: serverID, All: req.All},
+			},
+		}
+		writeImageOpResult(w, dispatcher, waiter, serverID, requestID, cmd, pruneOpTimeout, http.StatusOK)
 	}
 }
 

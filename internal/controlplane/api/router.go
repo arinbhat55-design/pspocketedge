@@ -244,6 +244,7 @@ func NewRouter(log *slog.Logger, st *store.Store, authMgr *auth.Manager, dispatc
 	mux.Handle("POST /api/servers/{id}/images/pull", authMgr.RequireAuth(handlePullImage(log, st, dispatcher, imageOpWaiter)))
 	mux.Handle("DELETE /api/servers/{id}/images/{imageId}", authMgr.RequireAuth(handleRemoveImage(log, dispatcher, imageOpWaiter)))
 	mux.Handle("POST /api/servers/{id}/images/prune", authMgr.RequireAuth(handlePruneImages(log, dispatcher, imageOpWaiter)))
+	mux.Handle("POST /api/servers/{id}/build-cache/prune", authMgr.RequireAuth(handlePruneBuildCache(log, dispatcher, imageOpWaiter)))
 
 	mux.Handle("GET /api/networks", authMgr.RequireAuth(handleListNetworks(log, st, dispatcher, networkListWaiter)))
 	mux.Handle("POST /api/servers/{id}/networks", authMgr.RequireAuth(handleCreateNetwork(log, dispatcher, networkOpWaiter)))
@@ -253,6 +254,7 @@ func NewRouter(log *slog.Logger, st *store.Store, authMgr *auth.Manager, dispatc
 
 	mux.Handle("GET /api/volumes", authMgr.RequireAuth(handleListVolumes(log, st, dispatcher, volumeListWaiter)))
 	mux.Handle("POST /api/servers/{id}/volumes", authMgr.RequireAuth(handleCreateVolume(log, dispatcher, volumeOpWaiter)))
+	mux.Handle("POST /api/servers/{id}/volumes/prune", authMgr.RequireAuth(handlePruneVolumes(log, dispatcher, volumeOpWaiter)))
 	mux.Handle("GET /api/servers/{id}/volumes/{name}", authMgr.RequireAuth(handleInspectVolume(log, dispatcher, volumeDetailWaiter)))
 	mux.Handle("DELETE /api/servers/{id}/volumes/{name}", authMgr.RequireAuth(handleRemoveVolume(log, dispatcher, volumeOpWaiter)))
 	mux.Handle("GET /api/servers/{id}/volumes/{name}/files", authMgr.RequireAuth(handleListVolumeFiles(log, dispatcher, volumeFileWaiter)))

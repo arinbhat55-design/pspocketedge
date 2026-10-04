@@ -95,6 +95,8 @@ message ControlMessage {
     BuildImageCommand build_image = 34;
     PushImageCommand push_image = 35;
     VolumeFileCommand volume_file = 36;
+    PruneVolumesCommand prune_volumes = 37;
+    PruneBuildCacheCommand prune_build_cache = 38;
   }
 }
 
@@ -454,6 +456,7 @@ message ContainerActionCommand {
   ContainerAction action = 4;
   int32 timeout_seconds = 5; // graceful stop/restart timeout; 0 = agent default
   bool force = 6;            // for REMOVE: remove even if running
+  bool remove_volumes = 7;   // for REMOVE: also remove its anonymous volumes (docker rm -v)
 }
 
 message CreateContainerCommand {
@@ -623,10 +626,20 @@ message PruneImagesCommand {
   bool all = 3;
 }
 
+// PruneBuildCacheCommand clears the builder's cache. all=false removes only
+// dangling cache records (docker builder prune); all=true removes every
+// cache record not in use by a running build (docker builder prune -a).
+message PruneBuildCacheCommand {
+  string request_id = 1;
+  string server_id = 2;
+  bool all = 3;
+}
+
 // ImageOpResult answers PullImageCommand, PushImageCommand,
-// RemoveImageCommand, and PruneImagesCommand alike, correlated via request_id — same one-request/
-// one-reply pattern ContainerOpResult already uses for container ops.
-// reclaimed_bytes is only meaningful for PruneImagesCommand.
+// RemoveImageCommand, PruneImagesCommand, and PruneBuildCacheCommand alike,
+// correlated via request_id — same one-request/one-reply pattern
+// ContainerOpResult already uses for container ops. reclaimed_bytes is only
+// meaningful for the two prune commands.
 message ImageOpResult {
   string request_id = 1;
   bool success = 2;
@@ -751,6 +764,16 @@ message RemoveVolumeCommand {
   bool force = 4;
 }
 
+// PruneVolumesCommand removes volumes no container references. all=false
+// removes only anonymous volumes (docker volume prune); all=true also
+// removes unused named volumes (docker volume prune -a). Deployment
+// volumes are always kept, since a redeploy or restore reattaches them.
+message PruneVolumesCommand {
+  string request_id = 1;
+  string server_id = 2;
+  bool all = 3;
+}
+
 message InspectVolumeCommand {
   string request_id = 1;
   string server_id = 2;
@@ -764,13 +787,17 @@ message VolumeDetail {
   VolumeSummary volume = 4;
 }
 
-// VolumeOpResult answers CreateVolumeCommand and RemoveVolumeCommand alike,
-// correlated via request_id — same pattern as NetworkOpResult above.
+// VolumeOpResult answers CreateVolumeCommand, RemoveVolumeCommand, and
+// PruneVolumesCommand alike, correlated via request_id — same pattern as
+// NetworkOpResult above. reclaimed_bytes and removed_count are only
+// meaningful for PruneVolumesCommand.
 message VolumeOpResult {
   string request_id = 1;
   bool success = 2;
   string error_message = 3;
   string name = 4;
+  int64 reclaimed_bytes = 5;
+  int32 removed_count = 6;
 }
 
 // VolumeFileCommand operates inside a named volume through a temporary

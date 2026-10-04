@@ -285,6 +285,7 @@ func handleContainerAction(log *slog.Logger, dispatcher *deploy.Dispatcher, opWa
 		Action         string `json:"action"`
 		TimeoutSeconds int32  `json:"timeoutSeconds,omitempty"`
 		Force          bool   `json:"force,omitempty"`
+		RemoveVolumes  bool   `json:"removeVolumes,omitempty"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -316,6 +317,7 @@ func handleContainerAction(log *slog.Logger, dispatcher *deploy.Dispatcher, opWa
 					Action:         action,
 					TimeoutSeconds: req.TimeoutSeconds,
 					Force:          req.Force,
+					RemoveVolumes:  req.RemoveVolumes,
 				},
 			},
 		}
@@ -349,6 +351,7 @@ func handleBulkContainerAction(log *slog.Logger, dispatcher *deploy.Dispatcher, 
 		Action         string             `json:"action"`
 		TimeoutSeconds int32              `json:"timeoutSeconds,omitempty"`
 		Force          bool               `json:"force,omitempty"`
+		RemoveVolumes  bool               `json:"removeVolumes,omitempty"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -373,7 +376,7 @@ func handleBulkContainerAction(log *slog.Logger, dispatcher *deploy.Dispatcher, 
 			wg.Add(1)
 			go func(i int, target bulkActionTarget) {
 				defer wg.Done()
-				results[i] = bulkDispatchOne(log, dispatcher, opWaiter, target, action, req.TimeoutSeconds, req.Force)
+				results[i] = bulkDispatchOne(log, dispatcher, opWaiter, target, action, req.TimeoutSeconds, req.Force, req.RemoveVolumes)
 			}(i, target)
 		}
 		wg.Wait()
@@ -382,7 +385,7 @@ func handleBulkContainerAction(log *slog.Logger, dispatcher *deploy.Dispatcher, 
 	}
 }
 
-func bulkDispatchOne(log *slog.Logger, dispatcher *deploy.Dispatcher, opWaiter *deploy.OpWaiter, target bulkActionTarget, action agentv1.ContainerAction, timeoutSeconds int32, force bool) bulkActionResult {
+func bulkDispatchOne(log *slog.Logger, dispatcher *deploy.Dispatcher, opWaiter *deploy.OpWaiter, target bulkActionTarget, action agentv1.ContainerAction, timeoutSeconds int32, force, removeVolumes bool) bulkActionResult {
 	requestID, err := auth.RandomToken()
 	if err != nil {
 		log.Error("failed to generate request id", "error", err)
@@ -398,6 +401,7 @@ func bulkDispatchOne(log *slog.Logger, dispatcher *deploy.Dispatcher, opWaiter *
 				Action:         action,
 				TimeoutSeconds: timeoutSeconds,
 				Force:          force,
+				RemoveVolumes:  removeVolumes,
 			},
 		},
 	}
